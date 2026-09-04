@@ -461,9 +461,24 @@ class OpenApiDocument
                     'current_page' => ['type' => 'integer'],
                     'from' => ['type' => ['integer', 'null']],
                     'last_page' => ['type' => 'integer'],
+                    'path' => ['type' => 'string'],
                     'per_page' => ['type' => 'integer'],
                     'to' => ['type' => ['integer', 'null']],
                     'total' => ['type' => 'integer'],
+                    // Barre de pagination prête à afficher : premier élément
+                    // « précédent », dernier « suivant », ellipses sans URL.
+                    'links' => [
+                        'type' => 'array',
+                        'items' => [
+                            'type' => 'object',
+                            'properties' => [
+                                'url' => ['type' => ['string', 'null']],
+                                'label' => ['type' => 'string'],
+                                'page' => ['type' => ['integer', 'null']],
+                                'active' => ['type' => 'boolean'],
+                            ],
+                        ],
+                    ],
                 ],
             ],
             'ValidationError' => [

@@ -126,3 +126,47 @@ it('envoie la fiche réservation avec son client sans enveloppe', function (): v
             ->missing('reservation.client.data')
         );
 });
+
+/**
+ * Régression : la barre de pagination lisait `links` à la racine — les quatre
+ * raccourcis premier/dernier/précédent/suivant — au lieu de `meta.links`, la
+ * liste numérotée. Aucun écran n'offrait donc de passer à la page suivante.
+ */
+it('fournit une barre de pagination navigable sur chaque écran de liste', function (): void {
+    Call::factory()->count(12)->for($this->agent, 'agent')->create();
+    Client::factory()->count(12)->create();
+    Reservation::factory()->count(12)->create();
+
+    $screens = [
+        'calls' => route('calls.index'),
+        'clients' => route('clients.index'),
+        'reservations' => route('reservations.index'),
+    ];
+
+    foreach ($screens as $prop => $url) {
+        $meta = $this->actingAs($this->agent)
+            ->get($url)
+            ->viewData('page')['props'][$prop]['meta'];
+
+        $pages = collect($meta['links'])->pluck('page')->filter()->all();
+
+        expect($meta['per_page'])->toBe(10)
+            ->and($meta['last_page'])->toBeGreaterThan(1)
+            ->and($pages)->toContain(2);
+    }
+});
+
+it('sert des lignes différentes sur la deuxième page', function (): void {
+    Call::factory()->count(12)->for($this->agent, 'agent')->create();
+
+    $idsOf = fn (string $url): array => collect(
+        $this->actingAs($this->agent)->get($url)->viewData('page')['props']['calls']['data']
+    )->pluck('id')->all();
+
+    $first = $idsOf(route('calls.index'));
+    $second = $idsOf(route('calls.index', ['page' => 2]));
+
+    expect($first)->toHaveCount(10)
+        ->and($second)->toHaveCount(2)
+        ->and(array_intersect($first, $second))->toBeEmpty();
+});

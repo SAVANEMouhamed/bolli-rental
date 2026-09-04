@@ -255,6 +255,6 @@ const openCall = (call: Call): void => {
             </EmptyState>
         </div>
 
-        <Pagination :meta="calls.meta" :links="calls.links" label="appels" />
+        <Pagination :meta="calls.meta" label="appels" />
     </div>
 </template>

@@ -107,11 +107,7 @@ defineOptions({
                     description="Aucun appel du service client ne concerne cette location."
                 />
             </div>
-            <Pagination
-                :meta="calls.meta"
-                :links="calls.links"
-                label="appels"
-            />
+            <Pagination :meta="calls.meta" label="appels" />
         </section>
 
         <div>

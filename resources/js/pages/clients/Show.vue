@@ -126,11 +126,7 @@ defineOptions({
                     description="Ce client n'a jamais contacté le service client."
                 />
             </div>
-            <Pagination
-                :meta="calls.meta"
-                :links="calls.links"
-                label="appels"
-            />
+            <Pagination :meta="calls.meta" label="appels" />
         </section>
 
         <div>

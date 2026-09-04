@@ -98,10 +98,6 @@ const { filters } = useFilters(
             />
         </div>
 
-        <Pagination
-            :meta="clients.meta"
-            :links="clients.links"
-            label="clients"
-        />
+        <Pagination :meta="clients.meta" label="clients" />
     </div>
 </template>

@@ -3,16 +3,39 @@
  * de forme, ce fichier change dans le même commit.
  */
 
+/**
+ * Un lien de la barre de pagination. `url` est nul sur l'ellipse et sur
+ * précédent/suivant quand on est au bord ; `page` est nul dans les mêmes cas.
+ */
+export type PaginationLink = {
+    url: string | null;
+    label: string;
+    page: number | null;
+    active: boolean;
+};
+
+/**
+ * Forme exacte d'une `ResourceCollection` paginée de Laravel : `links` porte les
+ * quatre raccourcis premier/dernier/précédent/suivant, et c'est `meta.links` qui
+ * contient la barre de pagination numérotée.
+ */
 export type Paginated<T> = {
     data: T[];
-    links: { url: string | null; label: string; active: boolean }[];
+    links: {
+        first: string | null;
+        last: string | null;
+        prev: string | null;
+        next: string | null;
+    };
     meta: {
         current_page: number;
         from: number | null;
         last_page: number;
+        path: string;
         per_page: number;
         to: number | null;
         total: number;
+        links: PaginationLink[];
     };
 };
 

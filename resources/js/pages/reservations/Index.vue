@@ -111,10 +111,6 @@ const { filters } = useFilters(
             />
         </div>
 
-        <Pagination
-            :meta="reservations.meta"
-            :links="reservations.links"
-            label="réservations"
-        />
+        <Pagination :meta="reservations.meta" label="réservations" />
     </div>
 </template>
