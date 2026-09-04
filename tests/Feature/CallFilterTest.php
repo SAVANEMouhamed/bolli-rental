@@ -127,14 +127,14 @@ it('trie les appels du plus récent au plus ancien', function (): void {
 });
 
 it('pagine la liste des appels', function (): void {
-    Call::factory()->count(20)->create();
+    Call::factory()->count(25)->create();
 
     $response = $this->get(route('calls.index'));
     $meta = $response->viewData('page')['props']['calls']['meta'];
 
-    expect($meta['total'])->toBe(20)
-        ->and($meta['per_page'])->toBe(15)
-        ->and($meta['last_page'])->toBe(2);
+    expect($meta['total'])->toBe(25)
+        ->and($meta['per_page'])->toBe(10)
+        ->and($meta['last_page'])->toBe(3);
 });
 
 it('filtre les appels rattachés à une réservation depuis sa fiche', function (): void {

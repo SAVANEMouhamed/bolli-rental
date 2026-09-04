@@ -15,6 +15,12 @@ use Inertia\Response;
  */
 class ClientController extends Controller
 {
+    /**
+     * Dix lignes par page sur tous les écrans de liste : une hauteur d'écran se lit
+     * sans défilement, et la pagination reste visible sans avoir à descendre.
+     */
+    private const PER_PAGE = 10;
+
     public function index(Request $request): Response
     {
         $search = $request->string('search')->trim()->value();
@@ -24,7 +30,7 @@ class ClientController extends Controller
             ->withCount(['calls', 'reservations'])
             ->when($search !== '', fn ($query) => $query->search($search))
             ->orderBy('last_name')
-            ->paginate(20)
+            ->paginate(self::PER_PAGE)
             ->withQueryString();
 
         return Inertia::render('clients/Index', [
@@ -45,7 +51,7 @@ class ClientController extends Controller
         $calls = $client->calls()
             ->with(['agent:id,name', 'reservation', 'tags:id,name,slug'])
             ->latest('called_at')
-            ->paginate(10);
+            ->paginate(self::PER_PAGE);
 
         return Inertia::render('clients/Show', [
             'client' => new ClientResource($client),

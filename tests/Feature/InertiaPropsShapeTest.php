@@ -51,10 +51,31 @@ it('envoie les listes du formulaire d\'appel comme des tableaux', function (): v
         ->assertInertia(fn ($page) => $page
             ->has('clients', 1)
             ->has('reservations', 1)
-            ->has('agents', 1)
-            ->has('tags', 1)
+            // Le formulaire lit `options.directions`, `options.reasons`… : étalées
+            // à la racine, elles laissaient `options` indéfini et le rendu du
+            // formulaire plantait après le titre.
+            ->has('options.directions', 2)
+            ->has('options.reasons', 5)
+            ->has('options.statuses', 3)
+            ->has('options.tags', 1)
             ->missing('clients.data')
             ->missing('reservations.data')
+        );
+});
+
+it('envoie au formulaire de correction les mêmes listes qu\'à la création', function (): void {
+    $call = Call::factory()->for($this->agent, 'agent')->create();
+
+    $this->actingAs($this->agent)
+        ->get(route('calls.edit', $call))
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->has('options.directions', 2)
+            ->has('options.reasons', 5)
+            ->has('options.statuses', 3)
+            ->has('options.tags', 1)
+            ->has('clients')
+            ->where('call.id', $call->id)
         );
 });
 

@@ -17,6 +17,12 @@ use Inertia\Response;
  */
 class ReservationController extends Controller
 {
+    /**
+     * Dix lignes par page sur tous les écrans de liste : une hauteur d'écran se lit
+     * sans défilement, et la pagination reste visible sans avoir à descendre.
+     */
+    private const PER_PAGE = 10;
+
     public function index(Request $request): Response
     {
         $status = $request->validate([
@@ -29,7 +35,7 @@ class ReservationController extends Controller
             ->withCount('calls')
             ->when($status, fn ($query, string $value) => $query->where('status', $value))
             ->latest('starts_at')
-            ->paginate(20)
+            ->paginate(self::PER_PAGE)
             ->withQueryString();
 
         return Inertia::render('reservations/Index', [
@@ -46,7 +52,7 @@ class ReservationController extends Controller
         $calls = $reservation->calls()
             ->with(['agent:id,name', 'client', 'tags:id,name,slug'])
             ->latest('called_at')
-            ->paginate(10);
+            ->paginate(self::PER_PAGE);
 
         return Inertia::render('reservations/Show', [
             'reservation' => new ReservationResource($reservation),

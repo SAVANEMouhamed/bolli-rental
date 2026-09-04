@@ -26,6 +26,12 @@ use Inertia\Response;
 
 class CallController extends Controller
 {
+    /**
+     * Dix lignes par page sur tous les écrans de liste : une hauteur d'écran se lit
+     * sans défilement, et la pagination reste visible sans avoir à descendre.
+     */
+    private const PER_PAGE = 10;
+
     public function index(CallFilterRequest $request): Response
     {
         $this->authorize('viewAny', Call::class);
@@ -39,7 +45,7 @@ class CallController extends Controller
             ])
             ->filtered($request->filters())
             ->latest('called_at')
-            ->paginate(15)
+            ->paginate(self::PER_PAGE)
             ->withQueryString();
 
         return Inertia::render('calls/Index', [
@@ -170,7 +176,9 @@ class CallController extends Controller
                 ->get();
 
         return [
-            ...$this->filterOptions(),
+            // `options` et non un étalement à la racine : c'est la forme que
+            // déclarent `calls/Create` et `calls/Edit`, et celle de l'écran de liste.
+            'options' => $this->filterOptions(),
             'clientSearch' => $search,
             'clients' => ClientResource::collection($clients),
             'reservations' => ReservationResource::collection($reservations),
