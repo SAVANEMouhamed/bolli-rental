@@ -27,7 +27,7 @@ Bonus du cahier des charges :
 
 | Bonus                           | État                                                |
 | ------------------------------- | --------------------------------------------------- |
-| Tests automatisés               | ✅ 114 tests Pest                                   |
+| Tests automatisés               | ✅ 115 tests Pest                                   |
 | API REST exposant les appels    | ✅ `/api/v1`, en lecture, documentée en OpenAPI 3.1 |
 | Volet IA (résumé, sentiment)    | ⛔ non commencé                                     |
 | Notification sur appel `urgent` | ⛔ non commencé                                     |
@@ -288,10 +288,12 @@ par défaut.
 
 ## Sécurité
 
-- Autorisation par `CallPolicy` : visibilité partagée sur le plateau — c'est le
-  problème que l'outil résout — mais correction et suppression réservées à l'agent
-  qui a enregistré l'appel. Vérifié côté serveur ; masquer un bouton dans Vue n'est
-  jamais une protection.
+- Autorisation par `CallPolicy` : historique partagé sur le plateau — c'est le
+  problème que l'outil résout — donc tout agent peut reprendre un appel et faire
+  évoluer son statut, mais seul son auteur peut le supprimer de l'historique
+  commun. L'auteur n'est jamais réécrit lors d'une correction, sans quoi le
+  classement du tableau de bord serait faussé. Vérifié côté serveur ; masquer un
+  bouton dans Vue n'est jamais une protection.
 - Filtres de liste validés avant d'atteindre le SQL : enums contraints par
   `Rule::enum`, identifiants par `Rule::exists`, granularité par liste blanche.
 - Une réservation rattachée doit appartenir au client de l'appel — vérifié en base
