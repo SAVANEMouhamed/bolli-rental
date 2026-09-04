@@ -32,9 +32,9 @@ class CallController extends Controller
 
         $calls = Call::query()
             ->with([
-                'client:id,first_name,last_name,phone',
+                'client',
                 'agent:id,name',
-                'reservation:id,vehicle,client_id',
+                'reservation',
                 'tags:id,name,slug',
             ])
             ->filtered($request->filters())
@@ -77,9 +77,9 @@ class CallController extends Controller
         $this->authorize('view', $call);
 
         $call->load([
-            'client:id,first_name,last_name,phone,email',
+            'client',
             'agent:id,name',
-            'reservation:id,vehicle,client_id,starts_at,ends_at,status',
+            'reservation',
             'tags:id,name,slug',
         ]);
 
@@ -95,7 +95,7 @@ class CallController extends Controller
     {
         $this->authorize('update', $call);
 
-        $call->load(['client:id,first_name,last_name,phone', 'tags:id,name,slug']);
+        $call->load(['client', 'tags:id,name,slug']);
 
         return Inertia::render('calls/Edit', [
             ...$this->formProps($request, $call->client_id),
@@ -157,7 +157,6 @@ class CallController extends Controller
         $selectedClient = $request->integer('client_id') ?: $clientId;
 
         $clients = Client::query()
-            ->select(['id', 'first_name', 'last_name', 'phone'])
             ->when($search !== '', fn (Builder $query) => $query->search($search))
             ->orderBy('last_name')
             ->limit(20)

@@ -55,5 +55,10 @@ class AppServiceProvider extends ServiceProvider
 
         // Un N+1 doit échouer pendant le développement, pas ralentir la production.
         Model::preventLazyLoading(! app()->isProduction());
+
+        // Même logique pour une colonne absente d'un `select()` ciblé : sans ce
+        // garde, l'attribut vaut silencieusement null et la panne n'apparaît que
+        // plus loin, au formatage, sous la forme d'une erreur incompréhensible.
+        Model::preventAccessingMissingAttributes(! app()->isProduction());
     }
 }

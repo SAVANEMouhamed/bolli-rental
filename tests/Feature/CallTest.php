@@ -34,6 +34,34 @@ it('liste les appels avec leurs relations chargées', function (): void {
         );
 });
 
+/**
+ * Régression : la liste ne chargeait la réservation que partiellement, sans ses
+ * dates, que la resource formate systématiquement. Le défaut ne se voyait pas
+ * parce qu'aucun test ne listait un appel effectivement rattaché à une location.
+ */
+it('liste sans erreur un appel rattaché à une réservation', function (): void {
+    $reservation = Reservation::factory()->create();
+    $call = Call::factory()->forReservation($reservation)->create();
+
+    $this->actingAs($this->agent)
+        ->get(route('calls.index'))
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->where('calls.data.0.id', $call->id)
+            ->where('calls.data.0.reservation.vehicle', $reservation->vehicle)
+        );
+});
+
+it('liste sans erreur un appel dont le client n\'a pas d\'adresse e-mail', function (): void {
+    $client = Client::factory()->create(['email' => null]);
+    Call::factory()->for($client)->create();
+
+    $this->actingAs($this->agent)
+        ->get(route('calls.index'))
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page->where('calls.data.0.client.email', null));
+});
+
 it('enregistre un appel et le crédite à l\'agent connecté', function (): void {
     $client = Client::factory()->create();
     $tag = Tag::factory()->create();

@@ -25,7 +25,7 @@ class ReservationController extends Controller
 
         $reservations = Reservation::query()
             ->select(['id', 'client_id', 'vehicle', 'starts_at', 'ends_at', 'status'])
-            ->with('client:id,first_name,last_name,phone')
+            ->with('client')
             ->withCount('calls')
             ->when($status, fn ($query, string $value) => $query->where('status', $value))
             ->latest('starts_at')
@@ -41,10 +41,10 @@ class ReservationController extends Controller
 
     public function show(Reservation $reservation): Response
     {
-        $reservation->load('client:id,first_name,last_name,phone,email');
+        $reservation->load('client');
 
         $calls = $reservation->calls()
-            ->with(['agent:id,name', 'client:id,first_name,last_name,phone', 'tags:id,name,slug'])
+            ->with(['agent:id,name', 'client', 'tags:id,name,slug'])
             ->latest('called_at')
             ->paginate(10);
 

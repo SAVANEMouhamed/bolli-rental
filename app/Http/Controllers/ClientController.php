@@ -43,7 +43,7 @@ class ClientController extends Controller
         ]);
 
         $calls = $client->calls()
-            ->with(['agent:id,name', 'reservation:id,vehicle,client_id', 'tags:id,name,slug'])
+            ->with(['agent:id,name', 'reservation', 'tags:id,name,slug'])
             ->latest('called_at')
             ->paginate(10);
 
