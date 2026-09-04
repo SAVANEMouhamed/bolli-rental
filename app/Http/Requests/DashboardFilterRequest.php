@@ -45,8 +45,11 @@ class DashboardFilterRequest extends FormRequest
         return ['from' => $from, 'to' => $to];
     }
 
+    /**
+     * @return 'day'|'week'
+     */
     public function granularity(): string
     {
-        return $this->string('granularity')->value() ?: 'day';
+        return $this->string('granularity')->value() === 'week' ? 'week' : 'day';
     }
 }
