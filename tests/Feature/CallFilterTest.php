@@ -78,7 +78,13 @@ it('filtre les appels par étiquette', function (): void {
 it('recherche un appel par le nom du client', function (): void {
     $client = Client::factory()->create(['first_name' => 'Aya', 'last_name' => 'Kouamé']);
     $found = Call::factory()->for($client)->create();
-    Call::factory()->create();
+
+    // Client témoin nommé explicitement : la factory tire dans une liste de dix-huit
+    // patronymes ivoiriens qui contient « Kouamé », et un témoin aléatoire faisait
+    // échouer ce test une fois sur dix-huit.
+    Call::factory()
+        ->for(Client::factory()->create(['first_name' => 'Seydou', 'last_name' => 'Traoré']))
+        ->create();
 
     expect(callIds(['search' => 'kouamé']))->toBe([$found->id]);
 });
