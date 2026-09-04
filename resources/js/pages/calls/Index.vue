@@ -163,10 +163,7 @@ const openCall = (call: Call): void => {
                 </div>
             </div>
 
-            <div
-                v-if="hasActiveFilters()"
-                class="flex items-end lg:col-span-4"
-            >
+            <div v-if="hasActiveFilters()" class="flex items-end lg:col-span-4">
                 <Button variant="ghost" size="sm" @click="reset()">
                     <X class="size-4" />
                     Réinitialiser les filtres
@@ -258,10 +255,6 @@ const openCall = (call: Call): void => {
             </EmptyState>
         </div>
 
-        <Pagination
-            :meta="calls.meta"
-            :links="calls.links"
-            label="appels"
-        />
+        <Pagination :meta="calls.meta" :links="calls.links" label="appels" />
     </div>
 </template>

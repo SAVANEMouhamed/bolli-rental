@@ -120,7 +120,11 @@ const stats = computed(() => [
                 <div
                     class="text-muted-foreground flex items-center gap-2 text-sm"
                 >
-                    <component :is="stat.icon" class="size-4" aria-hidden="true" />
+                    <component
+                        :is="stat.icon"
+                        class="size-4"
+                        aria-hidden="true"
+                    />
                     {{ stat.label }}
                 </div>
                 <p class="mt-2 text-2xl font-semibold tabular-nums">
@@ -133,7 +137,11 @@ const stats = computed(() => [
             <section class="bg-card rounded-xl border p-4">
                 <h2 class="mb-4 font-medium">
                     Volume d'appels
-                    {{ filters.granularity === 'week' ? 'par semaine' : 'par jour' }}
+                    {{
+                        filters.granularity === 'week'
+                            ? 'par semaine'
+                            : 'par jour'
+                    }}
                 </h2>
                 <VolumeChart
                     :series="volume"
@@ -174,10 +182,7 @@ const stats = computed(() => [
                         </TableRow>
                     </TableHeader>
                     <TableBody>
-                        <TableRow
-                            v-for="agent in agentRanking"
-                            :key="agent.id"
-                        >
+                        <TableRow v-for="agent in agentRanking" :key="agent.id">
                             <TableCell class="font-medium">
                                 {{ agent.name }}
                             </TableCell>

@@ -128,7 +128,10 @@ const resendInvitation = (agent: AgentAccount): void => {
                         <TableRow v-for="agent in agents" :key="agent.id">
                             <TableCell class="font-medium">
                                 {{ agent.name }}
-                                <Badge v-if="agent.is_current" variant="secondary">
+                                <Badge
+                                    v-if="agent.is_current"
+                                    variant="secondary"
+                                >
                                     vous
                                 </Badge>
                             </TableCell>

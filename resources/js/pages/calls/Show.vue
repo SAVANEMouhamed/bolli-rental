@@ -66,7 +66,11 @@ const remove = (): void => {
                 Supprimer définitivement cet appel de l'historique du plateau ?
             </p>
             <div class="flex gap-2">
-                <Button variant="ghost" size="sm" @click="confirmingDelete = false">
+                <Button
+                    variant="ghost"
+                    size="sm"
+                    @click="confirmingDelete = false"
+                >
                     Annuler
                 </Button>
                 <Button variant="destructive" size="sm" @click="remove">

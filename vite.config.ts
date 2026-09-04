@@ -77,6 +77,9 @@ export default defineConfig({
             'docs/**',
             'AGENTS.md',
             'CLAUDE.md',
+            // Énoncé reçu et consignes de mission : à conserver tels quels.
+            'EXERCICE_TECHNIQUE_Bolli_Rental_Dev_Laravel.md',
+            'prompt.md',
         ],
         sortTailwindcss: {
             functions: ['clsx', 'cn', 'cva'],

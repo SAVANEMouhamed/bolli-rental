@@ -31,7 +31,9 @@ const form = useForm({
     status: props.call?.status.value ?? 'resolved',
     // Défaut intelligent : un agent enregistre presque toujours l'appel qu'il
     // vient de raccrocher.
-    called_at: toDateTimeLocal(props.call?.called_at ?? new Date().toISOString()),
+    called_at: toDateTimeLocal(
+        props.call?.called_at ?? new Date().toISOString(),
+    ),
     duration_seconds: props.call?.duration_seconds ?? 0,
     notes: props.call?.notes ?? '',
     tags: props.call?.tags?.map((tag) => tag.id) ?? [],

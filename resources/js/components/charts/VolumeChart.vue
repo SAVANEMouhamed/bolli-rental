@@ -74,7 +74,13 @@ const total = computed<number>(() =>
         <table class="sr-only">
             <caption>
                 Volume d'appels par
-                {{ granularity === 'week' ? 'semaine' : 'jour' }} — {{ total }}
+                {{
+                    granularity === 'week' ? 'semaine' : 'jour'
+                }}
+                —
+                {{
+                    total
+                }}
                 au total
             </caption>
             <thead>
