@@ -27,7 +27,7 @@ Bonus du cahier des charges :
 
 | Bonus                           | État                                                |
 | ------------------------------- | --------------------------------------------------- |
-| Tests automatisés               | ✅ 109 tests Pest                                   |
+| Tests automatisés               | ✅ 114 tests Pest                                   |
 | API REST exposant les appels    | ✅ `/api/v1`, en lecture, documentée en OpenAPI 3.1 |
 | Volet IA (résumé, sentiment)    | ⛔ non commencé                                     |
 | Notification sur appel `urgent` | ⛔ non commencé                                     |
@@ -183,6 +183,11 @@ GET /api/v1/reservations
 GET /api/v1/reservations/{reservation}
 GET /api/v1/statistics               agrégations du tableau de bord
 ```
+
+L'enveloppe `data` n'apparaît que sur les listes paginées, où elle doit loger
+`links` et `meta` à côté des lignes ; une ressource unique et les statistiques
+sont renvoyées telles quelles. C'est la même règle que pour les props Inertia,
+posée une fois dans `AppServiceProvider`.
 
 La documentation OpenAPI 3.1 est servie sur **`/docs/api`** (Swagger UI, avec
 « Try it out » fonctionnel depuis un navigateur connecté) et le document brut sur
@@ -409,9 +414,17 @@ initialisation de dépôt non demandée.
   connecté durablement, case décochée comprise.** Corrigé par un champ caché piloté
   par la case, puis vérifié en HTTP sur l'application lancée — cookie absent avec
   `remember=0`, présent avec `remember=1`.
-- Une `JsonResource` seule s'enveloppe dans une clé `data`. Les pages de détail
-  attendaient l'objet lui-même : elles auraient reçu `call.data`. Corrigé par
-  `resolve()`.
+- Une `JsonResource` passée en prop Inertia s'enveloppe dans une clé `data`. Le
+  premier correctif — un `resolve()` sur les ressources uniques — n'a traité que
+  les cas visibles. Les collections des filtres restaient enveloppées :
+  `options.agents` arrivait en `{data: [...]}` là où la page appelle `.map()`, et
+  **l'écran des appels, cœur de l'exercice, s'affichait entièrement blanc**. La
+  requête répondant 200, ni les tests ni les journaux serveur ne le signalaient ;
+  le défaut a été trouvé en ouvrant la page, puis localisé en comparant les props
+  réellement envoyées aux types TypeScript qui les décrivent. Corrigé à la racine
+  par `JsonResource::withoutWrapping()` — une règle unique plutôt que dix
+  `resolve()` locaux qu'une resource ajoutée plus tard oublierait — et couvert par
+  cinq tests qui figent la forme des props de chaque écran.
 - La liste des appels ne chargeait la réservation et le client que partiellement,
   alors que les resources formatent toujours les dates et l'e-mail. La page tombait
   en 500 dès qu'un appel portait une réservation — **invisible pour la suite de
