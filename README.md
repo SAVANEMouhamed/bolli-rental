@@ -27,7 +27,7 @@ Bonus du cahier des charges :
 
 | Bonus                           | État                                                |
 | ------------------------------- | --------------------------------------------------- |
-| Tests automatisés               | ✅ 106 tests Pest                                   |
+| Tests automatisés               | ✅ 109 tests Pest                                   |
 | API REST exposant les appels    | ✅ `/api/v1`, en lecture, documentée en OpenAPI 3.1 |
 | Volet IA (résumé, sentiment)    | ⛔ non commencé                                     |
 | Notification sur appel `urgent` | ⛔ non commencé                                     |
@@ -350,6 +350,37 @@ par défaut.
 
 Pas encore déployée. L'URL Laravel Cloud sera ajoutée ici au moment du
 déploiement ; le compte de démonstration ci-dessus y donnera accès.
+
+### Procédure de déploiement
+
+Laravel Cloud, offre gratuite, sur la branche `main`.
+
+1. Connecter le dépôt GitHub, puis provisionner une base **Serverless Postgres** :
+   les variables `DB_*` sont injectées par la plateforme.
+2. Commande de build : `composer install --no-dev --optimize-autoloader`, puis
+   `npm ci && npm run build`.
+3. Commande de déploiement : `php artisan migrate --force` puis
+   `php artisan db:seed --force`. Les seeders sont rejouables — un redéploiement
+   ne duplique pas le jeu de démonstration et remet le mot de passe du compte de
+   recette à la valeur publiée ci-dessus.
+4. Variables d'environnement à poser sur la plateforme :
+
+| Variable                | Valeur                | Pourquoi                                                    |
+| ----------------------- | --------------------- | ----------------------------------------------------------- |
+| `APP_ENV`               | `production`          | active les gardes de production (voir `AppServiceProvider`) |
+| `APP_DEBUG`             | `false`               | aucune trace d'erreur exposée                               |
+| `APP_URL`               | l'URL fournie         | liens absolus corrects, notamment dans les e-mails          |
+| `SESSION_SECURE_COOKIE` | `true`                | cookie de session limité à HTTPS                            |
+| `MAIL_*`                | les identifiants SMTP | sans quoi l'invitation d'un agent échoue                    |
+
+Aucun de ces secrets ne vit dans le dépôt : `.env` est ignoré par Git et
+`.env.example` ne porte que des valeurs neutres.
+
+Les proxys de Laravel Cloud sont reconnus nativement par le framework, il n'y a
+rien à configurer pour le HTTPS derrière le répartiteur.
+
+L'instance et la base **hibernent** après une période d'inactivité sur l'offre
+gratuite : la première requête peut prendre quelques secondes.
 
 ---
 
