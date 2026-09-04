@@ -27,7 +27,7 @@ Bonus du cahier des charges :
 
 | Bonus                           | État                                                |
 | ------------------------------- | --------------------------------------------------- |
-| Tests automatisés               | ✅ 115 tests Pest                                   |
+| Tests automatisés               | ✅ 114 tests Pest                                   |
 | API REST exposant les appels    | ✅ `/api/v1`, en lecture, documentée en OpenAPI 3.1 |
 | Volet IA (résumé, sentiment)    | ⛔ non commencé                                     |
 | Notification sur appel `urgent` | ⛔ non commencé                                     |

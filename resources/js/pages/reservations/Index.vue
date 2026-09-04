@@ -43,7 +43,7 @@ const { filters } = useFilters(
     <div class="flex flex-col gap-6 p-4">
         <Heading
             title="Réservations"
-            description="Locations en cours, terminées et annulées — contexte des appels."
+            description="Locations en cours, terminées et annulées, en consultation : elles servent de contexte aux appels et viennent du système de réservation."
         />
 
         <div class="grid max-w-xs gap-1.5">

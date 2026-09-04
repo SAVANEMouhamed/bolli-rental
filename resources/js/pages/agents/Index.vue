@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { Head, useForm, router } from '@inertiajs/vue3';
-import { MailPlus, RotateCcw, UserPlus } from '@lucide/vue';
+import { Head, useForm } from '@inertiajs/vue3';
+import { MailPlus, UserPlus } from '@lucide/vue';
 import Heading from '@/components/Heading.vue';
 import InputError from '@/components/InputError.vue';
 import { Badge } from '@/components/ui/badge';
@@ -17,7 +17,6 @@ import {
     TableRow,
 } from '@/components/ui/table';
 import { index as agentsIndex, store } from '@/routes/agents';
-import { resend } from '@/routes/agents/invitation';
 import type { AgentAccount } from '@/types';
 
 defineOptions({
@@ -40,10 +39,6 @@ const invite = (): void => {
         preserveScroll: true,
         onSuccess: () => form.reset(),
     });
-};
-
-const resendInvitation = (agent: AgentAccount): void => {
-    router.post(resend(agent.id).url, {}, { preserveScroll: true });
 };
 </script>
 
@@ -108,7 +103,7 @@ const resendInvitation = (agent: AgentAccount): void => {
             <Heading
                 variant="small"
                 title="Plateau"
-                description="Les agents habilités à enregistrer des appels. Le lien d'invitation expire : renvoyez-en un si l'agent n'a pas eu le temps de définir son mot de passe."
+                description="Les agents habilités à enregistrer des appels. Un lien d'invitation expiré se remplace depuis « Mot de passe oublié ? », sur la page de connexion."
             />
             <span id="agents-heading" class="sr-only">Plateau</span>
 
@@ -120,9 +115,6 @@ const resendInvitation = (agent: AgentAccount): void => {
                             <TableHead>Adresse e-mail</TableHead>
                             <TableHead class="text-right">
                                 Appels traités
-                            </TableHead>
-                            <TableHead class="text-right">
-                                Lien d'invitation
                             </TableHead>
                         </TableRow>
                     </TableHeader>
@@ -143,28 +135,10 @@ const resendInvitation = (agent: AgentAccount): void => {
                             <TableCell class="text-right tabular-nums">
                                 {{ agent.calls_count }}
                             </TableCell>
-                            <TableCell class="text-right">
-                                <Button
-                                    v-if="!agent.is_current"
-                                    variant="ghost"
-                                    size="sm"
-                                    :title="`Envoyer un nouveau lien de définition du mot de passe à ${agent.email}`"
-                                    @click="resendInvitation(agent)"
-                                >
-                                    <RotateCcw class="size-4" />
-                                    Renvoyer l'invitation
-                                </Button>
-                                <span
-                                    v-else
-                                    class="text-muted-foreground text-sm"
-                                >
-                                    —
-                                </span>
-                            </TableCell>
                         </TableRow>
                         <TableRow v-if="agents.length === 0">
                             <TableCell
-                                colspan="4"
+                                colspan="3"
                                 class="text-muted-foreground py-10 text-center"
                             >
                                 <MailPlus class="mx-auto mb-2 size-6" />

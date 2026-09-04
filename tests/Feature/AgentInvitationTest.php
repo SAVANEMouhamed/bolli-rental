@@ -101,17 +101,6 @@ it('refuse une invitation sans nom ni adresse valide', function (): void {
     ])->assertSessionHasErrors(['name', 'email']);
 });
 
-it('renvoie une invitation à un agent existant', function (): void {
-    Notification::fake();
-    actingAsConfirmedAgent();
-
-    $agent = User::factory()->create();
-
-    $this->post(route('agents.invitation.resend', $agent))->assertRedirect();
-
-    Notification::assertSentTo($agent, AgentInvitation::class);
-});
-
 it("permet à l'agent invité de définir son mot de passe via le lien reçu", function (): void {
     Notification::fake();
     actingAsConfirmedAgent();

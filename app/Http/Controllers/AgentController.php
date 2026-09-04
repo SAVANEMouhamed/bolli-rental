@@ -48,7 +48,9 @@ class AgentController extends Controller
             'password' => Str::password(32),
         ]);
 
-        $this->sendInvitation($agent, $request->user()->name);
+        $token = Password::broker(config('fortify.passwords'))->createToken($agent);
+
+        $agent->notify(new AgentInvitation($token, $request->user()->name));
 
         Inertia::flash('toast', [
             'type' => 'success',
@@ -56,27 +58,5 @@ class AgentController extends Controller
         ]);
 
         return to_route('agents.index');
-    }
-
-    /**
-     * Renvoie l'invitation, par exemple quand le lien précédent a expiré.
-     */
-    public function resendInvitation(Request $request, User $agent): RedirectResponse
-    {
-        $this->sendInvitation($agent, $request->user()->name);
-
-        Inertia::flash('toast', [
-            'type' => 'success',
-            'message' => "Invitation renvoyée à {$agent->email}.",
-        ]);
-
-        return back();
-    }
-
-    private function sendInvitation(User $agent, string $invitedBy): void
-    {
-        $token = Password::broker(config('fortify.passwords'))->createToken($agent);
-
-        $agent->notify(new AgentInvitation($token, $invitedBy));
     }
 }

@@ -40,7 +40,7 @@ const { filters } = useFilters(
     <div class="flex flex-col gap-6 p-4">
         <Heading
             title="Clients"
-            description="Fiches clients et volume d'échanges avec le service client."
+            description="Fiches en consultation, alimentées par le système de réservation. Cet outil suit les appels, il ne gère pas le fichier client."
         />
 
         <div class="grid max-w-md gap-1.5">

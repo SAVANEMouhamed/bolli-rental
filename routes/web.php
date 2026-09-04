@@ -26,10 +26,6 @@ Route::middleware('auth')->group(function () {
         Route::post('agents', [AgentController::class, 'store'])
             ->middleware('throttle:10,1')
             ->name('agents.store');
-
-        Route::post('agents/{agent}/invitation', [AgentController::class, 'resendInvitation'])
-            ->middleware('throttle:6,1')
-            ->name('agents.invitation.resend');
     });
 });
 
