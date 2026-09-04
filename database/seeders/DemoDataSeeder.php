@@ -44,6 +44,13 @@ class DemoDataSeeder extends Seeder
 
     public function run(): void
     {
+        // Le seeder est rejoué à chaque déploiement : sans ce garde, un
+        // redéploiement empilerait un second jeu de démonstration au lieu de
+        // retrouver le premier.
+        if (Call::query()->exists()) {
+            return;
+        }
+
         $agents = User::query()->get();
         $tags = Tag::query()->get();
 
