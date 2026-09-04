@@ -5,6 +5,8 @@ namespace App\Models;
 use Database\Factories\ClientFactory;
 use Illuminate\Database\Eloquent\Attributes\Appends;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Attributes\Scope;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -53,5 +55,23 @@ class Client extends Model
     protected function fullName(): Attribute
     {
         return Attribute::get(fn (): string => trim("{$this->first_name} {$this->last_name}"));
+    }
+
+    /**
+     * Recherche d'un client au moment d'enregistrer un appel : l'agent tape un
+     * bout de nom ou de numéro, sans savoir dans quel champ il tombe.
+     *
+     * `LOWER(...) LIKE ?` plutôt que `ILIKE` : PostgreSQL sert la production,
+     * SQLite la suite de tests, et seul le premier connaît `ILIKE`.
+     *
+     * @param  Builder<$this>  $query
+     */
+    #[Scope]
+    protected function search(Builder $query, string $term): void
+    {
+        $query->whereRaw(
+            "LOWER(first_name || ' ' || last_name || ' ' || phone) LIKE ?",
+            ['%'.mb_strtolower($term).'%'],
+        );
     }
 }

@@ -2,8 +2,12 @@
 
 namespace App\Enums;
 
+use App\Concerns\EnumOptions;
+
 enum ReservationStatus: string
 {
+    use EnumOptions;
+
     case Active = 'active';
     case Completed = 'completed';
     case Cancelled = 'cancelled';

@@ -2,6 +2,7 @@
 
 namespace App\Notifications;
 
+use App\Models\User;
 use Illuminate\Bus\Queueable;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
@@ -22,12 +23,12 @@ class AgentInvitation extends Notification
     /**
      * @return list<string>
      */
-    public function via(object $notifiable): array
+    public function via(User $notifiable): array
     {
         return ['mail'];
     }
 
-    public function toMail(object $notifiable): MailMessage
+    public function toMail(User $notifiable): MailMessage
     {
         $minutes = config('auth.passwords.'.config('fortify.passwords').'.expire');
 
@@ -45,7 +46,7 @@ class AgentInvitation extends Notification
      * Le lien réutilise le flux de réinitialisation de Fortify : jeton haché en base,
      * à usage unique et expirant, plutôt qu'un mécanisme d'invitation parallèle.
      */
-    private function resetUrl(object $notifiable): string
+    private function resetUrl(User $notifiable): string
     {
         return route('password.reset', [
             'token' => $this->token,

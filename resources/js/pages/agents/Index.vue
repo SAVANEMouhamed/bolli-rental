@@ -18,7 +18,7 @@ import {
 } from '@/components/ui/table';
 import { index as agentsIndex, store } from '@/routes/agents';
 import { resend } from '@/routes/agents/invitation';
-import type { Agent } from '@/types';
+import type { AgentAccount } from '@/types';
 
 defineOptions({
     layout: {
@@ -27,7 +27,7 @@ defineOptions({
 });
 
 defineProps<{
-    agents: Agent[];
+    agents: AgentAccount[];
 }>();
 
 const form = useForm({
@@ -42,7 +42,7 @@ const invite = (): void => {
     });
 };
 
-const resendInvitation = (agent: Agent): void => {
+const resendInvitation = (agent: AgentAccount): void => {
     router.post(resend(agent.id).url, {}, { preserveScroll: true });
 };
 </script>
