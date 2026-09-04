@@ -49,7 +49,7 @@ class ReservationController extends Controller
             ->paginate(10);
 
         return Inertia::render('reservations/Show', [
-            'reservation' => (new ReservationResource($reservation))->resolve(),
+            'reservation' => new ReservationResource($reservation),
             'calls' => CallResource::collection($calls),
         ]);
     }

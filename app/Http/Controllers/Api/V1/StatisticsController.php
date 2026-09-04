@@ -25,19 +25,19 @@ class StatisticsController extends Controller
 
         $statistics = new CallStatistics($from, $to);
 
+        // Pas d'enveloppe `data` : elle n'existe dans cette API que sur les
+        // collections paginées, qui doivent loger `links` et `meta` à côté des lignes.
         return response()->json([
-            'data' => [
-                'period' => [
-                    'from' => $from->toDateString(),
-                    'to' => $to->toDateString(),
-                    'granularity' => $granularity,
-                ],
-                'summary' => $statistics->summary(),
-                'volume' => $statistics->volume($granularity),
-                'by_reason' => $statistics->byReason(),
-                'by_status' => $statistics->byStatus(),
-                'agent_ranking' => $statistics->agentRanking(),
+            'period' => [
+                'from' => $from->toDateString(),
+                'to' => $to->toDateString(),
+                'granularity' => $granularity,
             ],
+            'summary' => $statistics->summary(),
+            'volume' => $statistics->volume($granularity),
+            'by_reason' => $statistics->byReason(),
+            'by_status' => $statistics->byStatus(),
+            'agent_ranking' => $statistics->agentRanking(),
         ]);
     }
 }

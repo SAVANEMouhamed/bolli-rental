@@ -48,7 +48,7 @@ class ClientController extends Controller
             ->paginate(10);
 
         return Inertia::render('clients/Show', [
-            'client' => (new ClientResource($client))->resolve(),
+            'client' => new ClientResource($client),
             'calls' => CallResource::collection($calls),
         ]);
     }

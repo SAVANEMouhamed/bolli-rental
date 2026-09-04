@@ -172,10 +172,7 @@ class OpenApiDocument
                             'description' => 'Statistiques de la période',
                             'content' => [
                                 'application/json' => [
-                                    'schema' => [
-                                        'type' => 'object',
-                                        'properties' => ['data' => ['$ref' => '#/components/schemas/Statistics']],
-                                    ],
+                                    'schema' => ['$ref' => '#/components/schemas/Statistics'],
                                 ],
                             ],
                         ],
@@ -303,10 +300,9 @@ class OpenApiDocument
             'description' => $description,
             'content' => [
                 'application/json' => [
-                    'schema' => [
-                        'type' => 'object',
-                        'properties' => ['data' => ['$ref' => "#/components/schemas/{$schema}"]],
-                    ],
+                    // Pas d'enveloppe `data` : l'application désactive globalement
+                    // le wrapping des resources, et seule la pagination en garde une.
+                    'schema' => ['$ref' => "#/components/schemas/{$schema}"],
                 ],
             ],
         ];

@@ -84,10 +84,7 @@ class CallController extends Controller
         ]);
 
         return Inertia::render('calls/Show', [
-            // `resolve()` plutôt que la resource brute : une JsonResource seule
-            // s'enveloppe dans une clé `data`, et la page attend l'appel lui-même.
-            // Les collections paginées, elles, gardent `data`/`links`/`meta`.
-            'call' => (new CallResource($call))->resolve(),
+            'call' => new CallResource($call),
         ]);
     }
 
@@ -99,7 +96,7 @@ class CallController extends Controller
 
         return Inertia::render('calls/Edit', [
             ...$this->formProps($request, $call->client_id),
-            'call' => (new CallResource($call))->resolve(),
+            'call' => new CallResource($call),
         ]);
     }
 

@@ -4,6 +4,7 @@ namespace App\Providers;
 
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Http\Resources\Json\JsonResource;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\ServiceProvider;
@@ -33,6 +34,13 @@ class AppServiceProvider extends ServiceProvider
     protected function configureDefaults(): void
     {
         Date::use(CarbonImmutable::class);
+
+        // Une resource enveloppée dans `data` casse les props Inertia : le composant
+        // Vue reçoit `{data: [...]}` là où il attend une liste, et la page tombe en
+        // blanc. Règle unique pour toute l'application : l'enveloppe `data` n'existe
+        // que là où la pagination l'impose, c'est-à-dire dans les collections
+        // paginées, qui doivent loger `links` et `meta` à côté des lignes.
+        JsonResource::withoutWrapping();
 
         DB::prohibitDestructiveCommands(
             app()->isProduction(),

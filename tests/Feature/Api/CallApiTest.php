@@ -71,8 +71,8 @@ it("expose le détail d'un appel", function (): void {
     $this->actingAs($this->agent)
         ->getJson(route('api.v1.calls.show', $call))
         ->assertOk()
-        ->assertJsonPath('data.id', $call->id)
-        ->assertJsonPath('data.reservation.vehicle', $reservation->vehicle);
+        ->assertJsonPath('id', $call->id)
+        ->assertJsonPath('reservation.vehicle', $reservation->vehicle);
 });
 
 it("rend null la réservation d'un appel qui n'en a pas", function (): void {
@@ -81,7 +81,7 @@ it("rend null la réservation d'un appel qui n'en a pas", function (): void {
     $this->actingAs($this->agent)
         ->getJson(route('api.v1.calls.show', $call))
         ->assertOk()
-        ->assertJsonPath('data.reservation', null);
+        ->assertJsonPath('reservation', null);
 });
 
 it('renvoie 404 pour un appel inexistant', function (): void {
@@ -121,9 +121,9 @@ it('expose les mêmes statistiques que le tableau de bord', function (): void {
     $this->actingAs($this->agent)
         ->getJson(route('api.v1.statistics'))
         ->assertOk()
-        ->assertJsonPath('data.summary.total', 3)
-        ->assertJsonPath('data.summary.average_duration', 100)
+        ->assertJsonPath('summary.total', 3)
+        ->assertJsonPath('summary.average_duration', 100)
         ->assertJsonStructure([
-            'data' => ['period', 'summary', 'volume' => ['labels', 'values'], 'by_reason', 'by_status', 'agent_ranking'],
+            'period', 'summary', 'volume' => ['labels', 'values'], 'by_reason', 'by_status', 'agent_ranking',
         ]);
 });
