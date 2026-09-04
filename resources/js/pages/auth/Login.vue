@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { Form, Head } from '@inertiajs/vue3';
+import { ref } from 'vue';
 import InputError from '@/components/InputError.vue';
 import PasswordInput from '@/components/PasswordInput.vue';
 import TextLink from '@/components/TextLink.vue';
@@ -23,6 +24,14 @@ defineProps<{
     status?: string;
     canResetPassword: boolean;
 }>();
+
+/**
+ * Le champ posté est un input caché piloté par la case à cocher, et non la case
+ * elle-même : le Checkbox de reka-ui rend un input sans attribut `type`, donc un
+ * input texte toujours présent dans le FormData avec la valeur « on ». Laravel
+ * lisait alors `remember` comme vrai même case décochée.
+ */
+const remember = ref(false);
 </script>
 
 <template>
@@ -84,9 +93,19 @@ defineProps<{
 
             <div class="flex items-center justify-between">
                 <Label for="remember" class="flex items-center space-x-3">
-                    <Checkbox id="remember" name="remember" :tabindex="3" />
+                    <Checkbox
+                        id="remember"
+                        v-model="remember"
+                        :tabindex="3"
+                        data-test="remember-checkbox"
+                    />
                     <span>Rester connecté</span>
                 </Label>
+                <input
+                    type="hidden"
+                    name="remember"
+                    :value="remember ? 1 : 0"
+                />
             </div>
 
             <Button

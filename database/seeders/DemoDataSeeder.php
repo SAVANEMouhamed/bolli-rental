@@ -61,7 +61,7 @@ class DemoDataSeeder extends Seeder
             $reservation = fake()->boolean(30) ? $reservations->random() : null;
 
             return [
-                'client_id' => $reservation?->client_id ?? $clients->random()->id,
+                'client_id' => $reservation ? $reservation->client_id : $clients->random()->id,
                 'reservation_id' => $reservation?->id,
                 'user_id' => $agents->random()->id,
                 'status' => CallStatus::from(fake()->randomElement($statuses)),

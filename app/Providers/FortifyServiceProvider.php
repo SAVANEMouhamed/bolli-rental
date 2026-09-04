@@ -65,7 +65,12 @@ class FortifyServiceProvider extends ServiceProvider
 
         Fortify::twoFactorChallengeView(fn () => Inertia::render('auth/TwoFactorChallenge'));
 
-        Fortify::confirmPasswordView(fn () => Inertia::render('auth/ConfirmPassword'));
+        // Le bouton « Confirmer avec une clé d'accès » n'a de sens que si l'agent en a
+        // enregistré une : sinon le navigateur ouvre une invite qui ne peut qu'échouer.
+        Fortify::confirmPasswordView(fn (Request $request) => Inertia::render('auth/ConfirmPassword', [
+            'hasPasskeys' => Features::canManagePasskeys()
+                && $request->user()->passkeys()->exists(),
+        ]));
     }
 
     /**

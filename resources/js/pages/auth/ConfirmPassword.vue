@@ -1,11 +1,14 @@
 <script setup lang="ts">
 import { Form, Head } from '@inertiajs/vue3';
+import { ArrowLeft } from '@lucide/vue';
 import InputError from '@/components/InputError.vue';
 import PasswordInput from '@/components/PasswordInput.vue';
+import TextLink from '@/components/TextLink.vue';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Spinner } from '@/components/ui/spinner';
 import { store } from '@/routes/password/confirm';
+import { dashboard } from '@/routes';
 import {
     index as confirmOptions,
     store as confirmStore,
@@ -19,12 +22,17 @@ defineOptions({
             "Cette zone de l'application est protégée. Confirmez votre mot de passe pour continuer.",
     },
 });
+
+defineProps<{
+    hasPasskeys: boolean;
+}>();
 </script>
 
 <template>
     <Head title="Confirmation du mot de passe" />
 
     <PasskeyVerify
+        v-if="hasPasskeys"
         :routes="{
             options: confirmOptions(),
             submit: confirmStore(),
@@ -41,7 +49,7 @@ defineOptions({
     >
         <div class="space-y-6">
             <div class="grid gap-2">
-                <Label htmlFor="password">Mot de passe</Label>
+                <Label for="password">Mot de passe</Label>
                 <PasswordInput
                     id="password"
                     name="password"
@@ -66,4 +74,15 @@ defineOptions({
             </div>
         </div>
     </Form>
+
+    <div class="text-muted-foreground text-center text-sm">
+        <TextLink
+            :href="dashboard()"
+            class="inline-flex items-center gap-1"
+            data-test="back-to-dashboard-link"
+        >
+            <ArrowLeft class="size-4" />
+            Retour au tableau de bord
+        </TextLink>
+    </div>
 </template>
