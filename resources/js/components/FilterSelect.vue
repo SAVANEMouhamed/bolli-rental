@@ -11,10 +11,16 @@ withDefaults(
     defineProps<{
         options: { value: string | number; label: string }[];
         placeholder?: string;
+        /**
+         * Un filtre propose « aucune valeur » en tête de liste. Un choix
+         * obligatoire — la granularité du tableau de bord — n'en a pas : sans ce
+         * drapeau, le placeholder doublonnerait la première option.
+         */
+        clearable?: boolean;
         id?: string;
         class?: string;
     }>(),
-    { placeholder: 'Tous' },
+    { placeholder: 'Tous', clearable: true },
 );
 
 const model = defineModel<string | number | null>();
@@ -31,7 +37,7 @@ const model = defineModel<string | number | null>();
             )
         "
     >
-        <option :value="null">{{ placeholder }}</option>
+        <option v-if="clearable" :value="null">{{ placeholder }}</option>
         <option
             v-for="option in options"
             :key="option.value"

@@ -108,7 +108,7 @@ const resendInvitation = (agent: AgentAccount): void => {
             <Heading
                 variant="small"
                 title="Plateau"
-                description="Les agents habilités à enregistrer des appels."
+                description="Les agents habilités à enregistrer des appels. Le lien d'invitation expire : renvoyez-en un si l'agent n'a pas eu le temps de définir son mot de passe."
             />
             <span id="agents-heading" class="sr-only">Plateau</span>
 
@@ -121,7 +121,9 @@ const resendInvitation = (agent: AgentAccount): void => {
                             <TableHead class="text-right">
                                 Appels traités
                             </TableHead>
-                            <TableHead class="text-right">Accès</TableHead>
+                            <TableHead class="text-right">
+                                Lien d'invitation
+                            </TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -143,13 +145,21 @@ const resendInvitation = (agent: AgentAccount): void => {
                             </TableCell>
                             <TableCell class="text-right">
                                 <Button
+                                    v-if="!agent.is_current"
                                     variant="ghost"
                                     size="sm"
+                                    :title="`Envoyer un nouveau lien de définition du mot de passe à ${agent.email}`"
                                     @click="resendInvitation(agent)"
                                 >
                                     <RotateCcw class="size-4" />
-                                    Renvoyer l'accès
+                                    Renvoyer l'invitation
                                 </Button>
+                                <span
+                                    v-else
+                                    class="text-muted-foreground text-sm"
+                                >
+                                    —
+                                </span>
                             </TableCell>
                         </TableRow>
                         <TableRow v-if="agents.length === 0">

@@ -103,7 +103,7 @@ const stats = computed(() => [
                     id="dashboard-granularity"
                     v-model="filters.granularity"
                     :options="granularityOptions"
-                    placeholder="Par jour"
+                    :clearable="false"
                 />
             </div>
         </section>
