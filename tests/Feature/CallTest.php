@@ -182,12 +182,20 @@ it('affiche le détail d\'un appel', function (): void {
         );
 });
 
-it('interdit à un agent de modifier l\'appel d\'un collègue', function (): void {
-    $call = Call::factory()->create();
+/**
+ * Le suivi d'un appel ne s'arrête pas au raccroché : un appel laissé « en attente »
+ * est repris par qui est disponible. L'auteur, lui, ne change pas — c'est lui qui
+ * compte dans le classement du tableau de bord.
+ */
+it('laisse un agent reprendre l\'appel d\'un collègue sans s\'en attribuer le crédit', function (): void {
+    $collegue = User::factory()->create();
+    $call = Call::factory()->for($collegue, 'agent')->create([
+        'status' => CallStatus::Pending,
+    ]);
 
     $this->actingAs($this->agent)
         ->get(route('calls.edit', $call))
-        ->assertForbidden();
+        ->assertOk();
 
     $this->actingAs($this->agent)
         ->put(route('calls.update', $call), [
@@ -198,7 +206,10 @@ it('interdit à un agent de modifier l\'appel d\'un collègue', function (): voi
             'called_at' => now()->subHour()->format('Y-m-d\TH:i'),
             'duration_seconds' => 60,
         ])
-        ->assertForbidden();
+        ->assertRedirect(route('calls.show', $call));
+
+    expect($call->fresh()->status)->toBe(CallStatus::Resolved)
+        ->and($call->fresh()->user_id)->toBe($collegue->id);
 });
 
 it('interdit à un agent de supprimer l\'appel d\'un collègue', function (): void {

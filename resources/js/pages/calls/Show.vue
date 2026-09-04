@@ -53,6 +53,13 @@ const remove = (): void => {
                     <Trash2 class="size-4" />
                     Supprimer
                 </Button>
+                <p
+                    v-else
+                    class="text-muted-foreground self-center text-xs"
+                    title="La suppression retire une ligne de l'historique commun du plateau."
+                >
+                    Suppression réservée à {{ call.agent?.name }}
+                </p>
             </div>
         </div>
 
