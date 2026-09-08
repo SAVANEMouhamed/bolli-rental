@@ -16,3 +16,15 @@ paths:
 - Zéro règle métier ou de sécurité côté Vue : elle est décorative, elle est rejouée côté Laravel.
 - Jamais de `v-html` sur une donnée utilisateur. Jamais de template compilé à partir d'une chaîne dynamique. Jamais de secret ou de clé d'API dans le bundle.
 - Pas de manipulation DOM manuelle quand une directive ou une ref réactive suffit.
+
+## Piège — régénération Wayfinder
+
+Le plugin Vite est configuré avec `formVariants: true`. Une régénération manuelle
+doit donc passer `--with-form` :
+
+```bash
+php artisan wayfinder:generate --with-form
+```
+
+Sans ce drapeau, les helpers `.form()` disparaissent et une douzaine de composants
+du starter kit ne compilent plus (`Property 'form' does not exist`).

@@ -1,0 +1,25 @@
+name: bolli-rental
+
+services:
+    app:
+        image: ${APP_IMAGE:?renseigner APP_IMAGE dans .env}
+        restart: unless-stopped
+        env_file:
+            - .env
+        ports:
+            - '127.0.0.1:${APP_PORT:-8002}:8080'
+        # Rend la base gérée par 1Panel joignable via host.docker.internal quand elle
+        # n'est pas sur le réseau Docker de cette composition.
+        extra_hosts:
+            - 'host.docker.internal:host-gateway'
+        healthcheck:
+            test: ['CMD', 'wget', '-qO-', 'http://127.0.0.1:8080/up']
+            interval: 15s
+            timeout: 5s
+            retries: 5
+            start_period: 90s
+        logging:
+            driver: json-file
+            options:
+                max-size: '10m'
+                max-file: '3'

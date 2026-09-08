@@ -38,3 +38,8 @@ yarn-error.log
 node_modules/
 vendor/
 vscode/
+
+# Copies de travail à la racine : l'énoncé et le prompt de cadrage sont déjà
+# versionnés dans docs/internal/.
+/EXERCICE_TECHNIQUE_Bolli_Rental_Dev_Laravel.md
+/prompt.md

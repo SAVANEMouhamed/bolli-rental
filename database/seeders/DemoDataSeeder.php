@@ -44,6 +44,13 @@ class DemoDataSeeder extends Seeder
 
     public function run(): void
     {
+        // Le seeder est rejoué à chaque déploiement : sans ce garde, un
+        // redéploiement empilerait un second jeu de démonstration au lieu de
+        // retrouver le premier.
+        if (Call::query()->exists()) {
+            return;
+        }
+
         $agents = User::query()->get();
         $tags = Tag::query()->get();
 
@@ -61,7 +68,7 @@ class DemoDataSeeder extends Seeder
             $reservation = fake()->boolean(30) ? $reservations->random() : null;
 
             return [
-                'client_id' => $reservation?->client_id ?? $clients->random()->id,
+                'client_id' => $reservation ? $reservation->client_id : $clients->random()->id,
                 'reservation_id' => $reservation?->id,
                 'user_id' => $agents->random()->id,
                 'status' => CallStatus::from(fake()->randomElement($statuses)),

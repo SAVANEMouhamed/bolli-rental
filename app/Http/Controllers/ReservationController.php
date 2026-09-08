@@ -1,0 +1,62 @@
+<?php
+
+namespace App\Http\Controllers;
+
+use App\Enums\ReservationStatus;
+use App\Http\Resources\CallResource;
+use App\Http\Resources\ReservationResource;
+use App\Models\Reservation;
+use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
+use Inertia\Inertia;
+use Inertia\Response;
+
+/**
+ * Consultation seule, comme les clients : les réservations viennent des seeders
+ * et servent de contexte aux appels (§2b du cahier des charges).
+ */
+class ReservationController extends Controller
+{
+    /**
+     * Dix lignes par page sur tous les écrans de liste : une hauteur d'écran se lit
+     * sans défilement, et la pagination reste visible sans avoir à descendre.
+     */
+    private const PER_PAGE = 10;
+
+    public function index(Request $request): Response
+    {
+        $status = $request->validate([
+            'status' => ['nullable', Rule::enum(ReservationStatus::class)],
+        ])['status'] ?? null;
+
+        $reservations = Reservation::query()
+            ->select(['id', 'client_id', 'vehicle', 'starts_at', 'ends_at', 'status'])
+            ->with('client')
+            ->withCount('calls')
+            ->when($status, fn ($query, string $value) => $query->where('status', $value))
+            ->latest('starts_at')
+            ->paginate(self::PER_PAGE)
+            ->withQueryString();
+
+        return Inertia::render('reservations/Index', [
+            'reservations' => ReservationResource::collection($reservations),
+            'filters' => ['status' => $status],
+            'options' => ['statuses' => ReservationStatus::options()],
+        ]);
+    }
+
+    public function show(Reservation $reservation): Response
+    {
+        $reservation->load('client');
+
+        $calls = $reservation->calls()
+            ->with(['agent:id,name', 'client', 'tags:id,name,slug'])
+            ->latest('called_at')
+            ->paginate(self::PER_PAGE);
+
+        return Inertia::render('reservations/Show', [
+            'reservation' => new ReservationResource($reservation),
+            'calls' => CallResource::collection($calls),
+        ]);
+    }
+}

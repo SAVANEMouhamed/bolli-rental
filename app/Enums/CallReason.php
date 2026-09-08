@@ -2,8 +2,12 @@
 
 namespace App\Enums;
 
+use App\Concerns\EnumOptions;
+
 enum CallReason: string
 {
+    use EnumOptions;
+
     case Reservation = 'reservation';
     case Complaint = 'complaint';
     case Support = 'support';

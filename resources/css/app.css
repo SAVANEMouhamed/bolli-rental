@@ -169,4 +169,16 @@
     body {
         @apply bg-background text-foreground;
     }
+
+    /*
+     * Tailwind 4 a retiré `cursor: pointer` des boutons de son preflight pour
+     * coller au comportement natif du navigateur. Dans un outil de saisie, la
+     * flèche fait douter que l'élément réagisse : on rétablit la main partout,
+     * sauf sur un bouton désactivé, qui ne doit rien promettre.
+     */
+    button:not(:disabled),
+    [role='button']:not([aria-disabled='true']),
+    summary {
+        cursor: pointer;
+    }
 }

@@ -82,9 +82,21 @@ npm run build                         # build de prod
 
 ## Phase courante
 
-**Phase 1 — Initialisation.** Fondations uniquement (voir `docs/internal/cadrage-technique.md` §5, §28, §29).
-Interdit maintenant : dashboard, CRUD appels complet, filtres, statistiques, bonus.
-Runbook : `/setup-phase1`. Clôture : `/phase-gate`.
+**Phase 3 — MVP livré.** Le périmètre obligatoire du cahier des charges est complet :
+auth, clients, réservations, suivi des appels avec filtres et rattachement, tableau de
+bord avec graphiques. Deux bonus ont été validés explicitement et livrés : tests
+automatisés et API REST documentée en OpenAPI. S'y ajoute, hors cahier des charges et
+sur demande, l'envoi des accès agent par e-mail.
+
+Reste à faire : **déploiement Laravel Cloud** (`/deploy-laravel-cloud`), puis mise à jour
+du README avec l'URL publique.
+
+Toujours interdits sans validation explicite : volet IA (résumé, sentiment, transcript)
+et notification sur appel `urgent`.
+
+Deux dépendances restent en attente de ton accord (`composer require` est en `ask`) :
+`laravel/sanctum` pour ouvrir l'API en écriture à un client mobile, et `dedoc/scramble`
+pour générer l'OpenAPI au lieu de le construire à la main.
 
 ## Outillage IA
 
