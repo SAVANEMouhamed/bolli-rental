@@ -364,93 +364,115 @@ Le §5.2 du cahier des charges demande un déploiement sur **Laravel Cloud (offr
 gratuite)**. Le rendu s'en écarte volontairement : l'hébergement se fait sur un
 **VPS administré avec 1Panel**, faute d'offre gratuite exploitable au moment du
 rendu. L'exigence de fond — une URL publique testable avec un compte de
-démonstration documenté — est tenue à l'identique. C'est le seul écart au sujet,
-et il est signalé ici plutôt que découvert à l'exécution.
+démonstration documenté — est tenue à l'identique. C'est le seul écart au sujet.
 
-### Ce qui compose le déploiement
+### Architecture du déploiement
 
-| Fichier                        | Rôle                                                              |
-| ------------------------------ | ----------------------------------------------------------------- |
-| `Dockerfile`                   | Image de production, deux étages : construction puis exécution    |
-| `docker-compose.yml`           | Quatre conteneurs : `db`, `app`, `web`, `queue`                   |
-| `docker/entrypoint.sh`         | Migrations, seeders et caches au démarrage, selon le rôle         |
-| `docker/nginx.conf`            | Serveur web sans privilèges, en-têtes défensifs, cache des assets |
-| `docker/deploy-remote.sh`      | Script joué sur le VPS par la chaîne de livraison                 |
-| `.github/workflows/ci.yml`     | Qualité et tests, réutilisable                                    |
-| `.github/workflows/deploy.yml` | Construction, publication sur GHCR, livraison par SSH             |
+**Un seul conteneur applicatif.** La base PostgreSQL est gérée par 1Panel, hors
+composition, et c'est le proxy de 1Panel qui porte le domaine et TLS.
 
-Une seule image sert les quatre rôles, pilotés par `CONTAINER_ROLE`. Le serveur
-web y trouve donc exactement les assets compilés avec le code PHP qu'exécute
-l'application : deux images séparées finiraient par diverger.
+L'image repose sur **FrankenPHP** plutôt que sur nginx + PHP-FPM : PHP-FPM ne
+parle que FastCGI et ne peut donc pas être seul derrière un proxy HTTP. FrankenPHP
+embarque Caddy, sert les assets statiques et PHP dans le même processus, et tourne
+ici en **mode classique** — pas en mode worker Octane : la sémantique de requête
+reste exactement celle de PHP-FPM, sans état partagé entre requêtes.
 
-**Tout est automatique au démarrage du conteneur `app`** : attente de la base,
-migrations, jeu de démonstration, puis caches de configuration, de routes, de
-vues et d'événements. Les seeders sont idempotents ; un redéploiement ne duplique
-rien et remet le mot de passe du compte de recette à la valeur publiée ci-dessus.
+| Fichier                        | Rôle                                            |
+| ------------------------------ | ----------------------------------------------- |
+| `Dockerfile`                   | Construction (Composer, Node) puis image finale |
+| `docker/Caddyfile`             | Serveur HTTP, compression, cache des assets     |
+| `docker/entrypoint.sh`         | Attente base, migrations, seeders, caches       |
+| `docker-compose.yml`           | Le service applicatif                           |
+| `.github/workflows/deploy.yml` | Tests, image, livraison                         |
+
+L'étage de construction pèse ~780 Mo (Composer, Node, `node_modules`) ; l'image
+finale ~350 Mo, dont 263 Mo de base FrankenPHP. Elle ne contient ni Node, ni
+Composer, ni dépendances de développement, ni `.env`, et tourne sous `www-data`.
+
+**Tout est automatique au démarrage** : attente de la base, migrations, jeu de
+démonstration, puis caches de configuration, de routes, de vues et d'événements.
+Les seeders sont idempotents ; un redéploiement ne duplique rien.
 
 ### Mise en place, une seule fois
 
-```bash
-# sur le VPS, dans le répertoire de déploiement
-cp docker/env.production.example .env   # puis compléter APP_KEY, DB_PASSWORD, MAIL_*
-php artisan key:generate --show         # depuis un poste de développement
-```
+Trois gestes manuels, et rien d'autre :
 
-Puis, côté GitHub, six secrets de dépôt :
+1. Créer la base PostgreSQL dans **1Panel**.
+2. Créer le répertoire de déploiement sur le VPS, appartenant à l'utilisateur SSH,
+   qui doit être membre du groupe `docker`.
+3. Créer un site dans **1Panel**, en proxy inverse vers `127.0.0.1:8080`, avec son
+   certificat.
 
-| Secret               | Contenu                                                            |
-| -------------------- | ------------------------------------------------------------------ |
-| `DEPLOY_HOST`        | adresse du VPS                                                     |
-| `DEPLOY_USER`        | utilisateur SSH, membre du groupe `docker`                         |
-| `DEPLOY_PORT`        | port SSH, `22` par défaut                                          |
-| `DEPLOY_PATH`        | répertoire contenant `docker-compose.yml` et `.env`                |
-| `DEPLOY_SSH_KEY`     | clé privée dédiée au déploiement, sans phrase de passe             |
-| `DEPLOY_KNOWN_HOSTS` | sortie de `ssh-keyscan -p <port> <hôte>`, relevée sur un canal sûr |
+Puis renseigner le dépôt GitHub. Le fichier d'environnement du serveur et la
+composition sont **rendus et déposés par la chaîne à chaque livraison** : rien
+n'est à écrire ni à maintenir sur le VPS.
 
-L'empreinte du serveur est fournie à l'avance plutôt que découverte à la première
-connexion : accepter une clé inconnue, c'est accepter un serveur inconnu.
+**Secrets** (`Settings › Secrets and variables › Actions › Secrets`) :
 
-Enfin, dans 1Panel, un site en proxy inverse vers `127.0.0.1:8080` avec un
-certificat Let's Encrypt. Le conteneur `web` n'écoute que sur la boucle locale :
-le proxy est le seul chemin d'entrée, et PostgreSQL n'est joignable que depuis le
-réseau Docker interne.
+| Secret           | Contenu                                     |
+| ---------------- | ------------------------------------------- |
+| `DEPLOY_HOST`    | adresse du VPS                              |
+| `DEPLOY_USER`    | utilisateur SSH                             |
+| `DEPLOY_PATH`    | répertoire de déploiement                   |
+| `DEPLOY_SSH_KEY` | clé privée dédiée, sans phrase de passe     |
+| `DEPLOY_PORT`    | port SSH — facultatif, `22` par défaut      |
+| `APP_KEY`        | sortie de `php artisan key:generate --show` |
+| `DB_PASSWORD`    | mot de passe de la base créée dans 1Panel   |
+| `MAIL_PASSWORD`  | mot de passe SMTP — facultatif              |
+
+**Variables** (même écran, onglet `Variables`) :
+
+| Variable                                                          | Défaut                                  |
+| ----------------------------------------------------------------- | --------------------------------------- |
+| `APP_URL` — requis                                                | —                                       |
+| `DB_HOST`                                                         | `host.docker.internal`                  |
+| `DB_PORT` · `DB_DATABASE` · `DB_USERNAME`                         | `5432` · `bolli` · `bolli`              |
+| `APP_PORT`                                                        | `8080`                                  |
+| `MAIL_HOST` · `MAIL_PORT` · `MAIL_USERNAME` · `MAIL_FROM_ADDRESS` | vide ⇒ e-mails écrits dans les journaux |
+| `SEED_ON_DEPLOY`                                                  | `true`                                  |
+
+`APP_KEY` est un secret et non une valeur générée à chaque livraison : la
+régénérer invaliderait toutes les sessions et tous les cookies chiffrés.
+
+Le job échoue avec un message explicite si `APP_KEY`, `DB_PASSWORD` ou `APP_URL`
+manquent, plutôt que de livrer une application qui ne démarrera pas.
 
 ### Ce que fait un push
 
-`develop` et `main` livrent sur le **même** environnement, à la demande : la
-dernière livraison gagne, et un verrou de concurrence empêche deux déploiements
-de se croiser.
+`develop` et `main` livrent sur le **même** environnement : la dernière livraison
+gagne, et un verrou de concurrence empêche deux déploiements de se croiser. Une
+pull request ne déclenche que les contrôles.
 
-1. **CI** — formatage, lint, types, PHPStan niveau 7, 118 tests Pest, plus les
-   migrations et les seeders rejoués sur un vrai PostgreSQL. Rien n'est livré sans
-   ces contrôles au vert.
-2. **Image** — construction et publication sur GHCR sous une étiquette immuable
-   `sha-<commit>`, avec cache de couches dans le registre.
-3. **Livraison** — `docker compose up -d --wait` sur le VPS. `--wait` n'attend pas
-   le démarrage mais la **santé** des conteneurs : une migration qui échoue fait
-   échouer la livraison au lieu de publier une application morte.
-4. **Vérification** — appel de `/up` depuis le VPS.
+1. **Contrôles** — formatage, lint, types, PHPStan niveau 7, 118 tests Pest, plus
+   les migrations et les seeders rejoués sur un vrai PostgreSQL.
+2. **Image** — publication sur GHCR en `latest` et en `sha-<commit>`, avec cache
+   de couches dans le registre.
+3. **Configuration** — rendu du fichier d'environnement à partir des secrets et
+   des variables, en `0600`, valeurs échappées.
+4. **Livraison** — dépôt de la composition et de la configuration, puis
+   `docker compose up -d --wait`, qui attend la **santé** du conteneur : une
+   migration en échec fait échouer la livraison au lieu de publier une
+   application morte.
 
-Revenir en arrière ne demande qu'une chose, puisque l'étiquette nomme un commit :
+Revenir en arrière depuis le VPS, sans rien réécrire :
 
 ```bash
-sed -i 's|^APP_IMAGE=.*|APP_IMAGE=ghcr.io/<compte>/bolli-rental:sha-<commit>|' .env
-docker compose up -d --wait
+APP_IMAGE=ghcr.io/<compte>/bolli-rental:sha-<commit> docker compose up -d --wait
 ```
 
-### Deux points de vigilance assumés
+### Deux points assumés
 
 **`fakerphp/faker` est une dépendance de production.** L'image est construite avec
 `--no-dev`, et le jeu de démonstration exigé au §2b est produit par des factories
 qui s'appuient sur Faker. Sans ce déplacement, le conteneur démarre puis échoue au
-seeding. C'est le prix d'un déploiement qui est une **démonstration** : sur une
-vraie production, les seeders et Faker disparaîtraient ensemble.
+seeding. C'est le prix d'un déploiement qui est une démonstration : sur une vraie
+production, les seeders et Faker disparaîtraient ensemble.
 
 **`TRUSTED_PROXIES=*` est sûr ici, et seulement ici.** Le conteneur n'est publié
-que sur la boucle locale du VPS : le proxy est le seul émetteur possible des
-en-têtes `X-Forwarded-*`. Sans cette valeur, Laravel se croit en clair, fabrique
-des liens `http` dans les e-mails d'invitation et rend `SESSION_SECURE_COOKIE`
-inopérant. Deux tests couvrent les deux sens de la règle.
+que sur la boucle locale : le proxy est le seul émetteur possible des en-têtes
+`X-Forwarded-*`. Sans cette valeur, Laravel se croit en clair, fabrique des liens
+`http` dans les e-mails d'invitation et rend `SESSION_SECURE_COOKIE` inopérant.
+Deux tests couvrent les deux sens de la règle.
 
 ---
 

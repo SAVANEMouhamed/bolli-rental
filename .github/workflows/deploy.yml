@@ -1,150 +1,238 @@
-# Livraison continue vers le VPS.
-#
-# Un push sur `develop` ou sur `main` déploie sur le même environnement, à la
-# demande du responsable du projet : la dernière livraison gagne. Le verrou de
-# concurrence garantit qu'elles ne se croisent jamais.
-#
-# La chaîne ne dépend d'aucune action tierce : seule `actions/checkout`, publiée
-# par GitHub, est utilisée. La construction et la livraison passent par le client
-# Docker et par ssh, déjà présents sur le runner. C'est autant de code que nous
-# n'exécutons pas en confiance aveugle.
-
-name: Déploiement
+name: CI et déploiement
 
 on:
   push:
-    branches:
-      - main
-      - develop
+    branches: [main, develop]
+  pull_request:
 
 permissions:
   contents: read
   packages: write
 
 concurrency:
-  group: deploiement-vps
+  group: deploiement
   cancel-in-progress: false
-
-env:
-  REGISTRY: ghcr.io
 
 jobs:
   ci:
-    uses: ./.github/workflows/ci.yml
-
-  image:
-    name: Construire et publier l'image
-    needs: ci
-    runs-on: ubuntu-latest
-    timeout-minutes: 25
-    outputs:
-      image: ${{ steps.tags.outputs.image }}
-
-    steps:
-      - name: Récupérer le code
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-
-      - name: Calculer les étiquettes
-        id: tags
-        run: |
-          repository="${REGISTRY}/${GITHUB_REPOSITORY,,}"
-          branch="${GITHUB_REF_NAME//\//-}"
-          # L'étiquette déployée est immuable : elle nomme un commit précis, ce
-          # qui rend un retour arrière trivial et un diagnostic sans ambiguïté.
-          {
-            echo "image=${repository}:sha-${GITHUB_SHA::12}"
-            echo "branch_tag=${repository}:${branch}"
-            echo "cache_tag=${repository}:buildcache"
-          } >> "$GITHUB_OUTPUT"
-
-      - name: S'authentifier auprès de GHCR
-        env:
-          TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: printf '%s' "$TOKEN" | docker login "$REGISTRY" -u "${{ github.actor }}" --password-stdin
-
-      - name: Construire et publier
-        run: |
-          docker buildx create --use --name builder --driver docker-container >/dev/null
-          docker buildx build \
-            --tag "${{ steps.tags.outputs.image }}" \
-            --tag "${{ steps.tags.outputs.branch_tag }}" \
-            --cache-from "type=registry,ref=${{ steps.tags.outputs.cache_tag }}" \
-            --cache-to "type=registry,ref=${{ steps.tags.outputs.cache_tag }},mode=max" \
-            --label "org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}" \
-            --label "org.opencontainers.image.revision=${{ github.sha }}" \
-            --label "org.opencontainers.image.created=$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
-            --provenance=false \
-            --push \
-            .
-
-  deploy:
-    name: Livrer sur le VPS
-    needs: image
+    name: Qualité et tests
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    environment: production
+
+    # La suite Pest tourne sur SQLite ; sans cette base, le moteur de production
+    # ne serait jamais vérifié — c'est là que vivent les contraintes CHECK.
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_DB: bolli_ci
+          POSTGRES_USER: bolli
+          POSTGRES_PASSWORD: bolli
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U bolli -d bolli_ci"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 12
+
+    env:
+      DB_CONNECTION: pgsql
+      DB_HOST: 127.0.0.1
+      DB_PORT: 5432
+      DB_DATABASE: bolli_ci
+      DB_USERNAME: bolli
+      DB_PASSWORD: bolli
 
     steps:
-      # La clé et l'empreinte du serveur passent par des variables d'environnement
-      # et non par une interpolation dans le script : une valeur interpolée finit
-      # dans le texte exécuté, et peut s'y comporter autrement qu'en donnée.
-      - name: Récupérer le code
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
 
-      - name: Préparer l'accès SSH
+      - uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # v2
+        with:
+          php-version: '8.4'
+          extensions: pdo_pgsql
+          tools: composer:v2
+          coverage: none
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Installer les dépendances
+        run: |
+          composer install --no-interaction --prefer-dist --no-progress
+          npm ci --no-audit --no-fund
+
+      - name: Préparer l'environnement
+        run: |
+          cp .env.example .env
+          php artisan key:generate
+
+      # Les tests rendent la vue racine d'Inertia, qui appelle @vite : sans
+      # manifeste, toute la suite échoue.
+      - name: Compiler les assets
+        run: npm run build
+
+      - name: Migrations et seeders sur PostgreSQL
+        run: |
+          php artisan migrate --force --no-interaction
+          php artisan db:seed --force --no-interaction
+          php artisan db:seed --force --no-interaction
+
+      - name: Contrôles de qualité et tests
+        run: composer ci:check
+
+  deploy:
+    name: Construire et livrer
+    needs: ci
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Publier l'image
+        env:
+          TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          repository="ghcr.io/${GITHUB_REPOSITORY,,}"
+          printf '%s' "$TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+          docker buildx create --use --driver docker-container >/dev/null
+          docker buildx build \
+            --tag "${repository}:latest" \
+            --tag "${repository}:sha-${GITHUB_SHA::12}" \
+            --cache-from "type=registry,ref=${repository}:buildcache" \
+            --cache-to "type=registry,ref=${repository}:buildcache,mode=max" \
+            --label "org.opencontainers.image.source=${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}" \
+            --label "org.opencontainers.image.revision=${GITHUB_SHA}" \
+            --provenance=false \
+            --push .
+
+      # L'environnement du VPS est rendu ici à chaque livraison : le serveur ne
+      # porte aucune configuration à maintenir à la main, et GitHub reste la seule
+      # source des secrets.
+      - name: Composer la configuration du serveur
+        env:
+          APP_KEY: ${{ secrets.APP_KEY }}
+          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+          MAIL_PASSWORD: ${{ secrets.MAIL_PASSWORD }}
+          APP_URL: ${{ vars.APP_URL }}
+          APP_PORT: ${{ vars.APP_PORT }}
+          DB_HOST: ${{ vars.DB_HOST }}
+          DB_PORT: ${{ vars.DB_PORT }}
+          DB_DATABASE: ${{ vars.DB_DATABASE }}
+          DB_USERNAME: ${{ vars.DB_USERNAME}}
+          MAIL_HOST: ${{ vars.MAIL_HOST }}
+          MAIL_PORT: ${{ vars.MAIL_PORT }}
+          MAIL_USERNAME: ${{ vars.MAIL_USERNAME }}
+          MAIL_FROM_ADDRESS: ${{ vars.MAIL_FROM_ADDRESS }}
+          SEED_ON_DEPLOY: ${{ vars.SEED_ON_DEPLOY || 'true' }}
+        run: |
+          for required in APP_KEY DB_PASSWORD APP_URL; do
+            if [ -z "${!required}" ]; then
+              echo "::error::${required} est vide — renseigner le secret ou la variable du dépôt"
+              exit 1
+            fi
+          done
+
+          # Sans serveur SMTP configuré, les e-mails partent dans les journaux
+          # plutôt que de faire échouer l'invitation d'un agent.
+          mailer=log
+          [ -n "$MAIL_HOST" ] && mailer=smtp
+
+          # Les valeurs sont mises entre guillemets et échappées : un mot de passe
+          # d'application Gmail contient des espaces, et dotenv s'arrêterait au
+          # premier. Un `$` ou un `"` non échappés casseraient la lecture de la
+          # même façon.
+          for name in APP_KEY APP_URL DB_HOST DB_DATABASE DB_USERNAME DB_PASSWORD \
+                      MAIL_HOST MAIL_USERNAME MAIL_PASSWORD MAIL_FROM_ADDRESS; do
+            printf -v "$name" '"%s"' "$(printf '%s' "${!name}" | sed 's/[\\"$]/\\&/g')"
+          done
+
+          umask 077
+          cat > .env <<CONFIG
+          APP_IMAGE=ghcr.io/${GITHUB_REPOSITORY,,}:latest
+          APP_PORT=${APP_PORT}
+
+          APP_NAME="Bolli Rental"
+          APP_ENV=production
+          APP_KEY=${APP_KEY}
+          APP_DEBUG=false
+          APP_URL=${APP_URL}
+          APP_LOCALE=fr
+          APP_FALLBACK_LOCALE=en
+          APP_FAKER_LOCALE=fr_FR
+
+          LOG_CHANNEL=stderr
+          LOG_STACK=stderr
+          LOG_LEVEL=warning
+
+          DB_CONNECTION=pgsql
+          DB_HOST=${DB_HOST}
+          DB_PORT=${DB_PORT}
+          DB_DATABASE=${DB_DATABASE}
+          DB_USERNAME=${DB_USERNAME}
+          DB_PASSWORD=${DB_PASSWORD}
+
+          SESSION_DRIVER=database
+          SESSION_LIFETIME=120
+          SESSION_SECURE_COOKIE=true
+          SESSION_SAME_SITE=lax
+
+          QUEUE_CONNECTION=sync
+          CACHE_STORE=database
+          BROADCAST_CONNECTION=log
+          FILESYSTEM_DISK=local
+
+          TRUSTED_PROXIES=*
+
+          MAIL_MAILER=${mailer}
+          MAIL_SCHEME=smtp
+          MAIL_HOST=${MAIL_HOST}
+          MAIL_PORT=${MAIL_PORT}
+          MAIL_USERNAME=${MAIL_USERNAME}
+          MAIL_PASSWORD=${MAIL_PASSWORD}
+          MAIL_FROM_ADDRESS=${MAIL_FROM_ADDRESS}
+          MAIL_FROM_NAME="\${APP_NAME}"
+
+          SEED_ON_DEPLOY=${SEED_ON_DEPLOY}
+          CONFIG
+
+      - name: Livrer sur le VPS
         env:
           SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
-          KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+          HOST: ${{ secrets.DEPLOY_HOST }}
+          SSH_USER: ${{ secrets.DEPLOY_USER }}
+          PORT: ${{ secrets.DEPLOY_PORT || '22' }}
+          TARGET: ${{ secrets.DEPLOY_PATH }}
+          TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           install -d -m 700 ~/.ssh
           printf '%s\n' "$SSH_KEY" > ~/.ssh/id_deploy
           chmod 600 ~/.ssh/id_deploy
-          # Empreinte connue à l'avance plutôt que ssh-keyscan : accepter une clé
-          # inconnue à la première connexion, c'est accepter un serveur inconnu.
-          printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
-          chmod 600 ~/.ssh/known_hosts
+          ssh-keyscan -p "$PORT" "$HOST" >> ~/.ssh/known_hosts 2>/dev/null
 
-      - name: Envoyer la composition
-        env:
-          HOST: ${{ secrets.DEPLOY_HOST }}
-          SSH_USER: ${{ secrets.DEPLOY_USER }}
-          PORT: ${{ secrets.DEPLOY_PORT || '22' }}
-          TARGET: ${{ secrets.DEPLOY_PATH }}
-        run: |
-          scp -i ~/.ssh/id_deploy -P "$PORT" \
+          scp -i ~/.ssh/id_deploy -P "$PORT" -q \
             docker-compose.yml "$SSH_USER@$HOST:$TARGET/docker-compose.yml"
+          scp -i ~/.ssh/id_deploy -P "$PORT" -q \
+            server-config "$SSH_USER@$HOST:$TARGET/.env"
 
-      - name: Déployer
-        env:
-          HOST: ${{ secrets.DEPLOY_HOST }}
-          SSH_USER: ${{ secrets.DEPLOY_USER }}
-          PORT: ${{ secrets.DEPLOY_PORT || '22' }}
-          TARGET: ${{ secrets.DEPLOY_PATH }}
-          IMAGE: ${{ needs.image.outputs.image }}
-          REGISTRY_USER: ${{ github.actor }}
-          REGISTRY_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          # Le script part sur l'entrée standard et le jeton sur la ligne qui suit :
-          # il n'apparaît donc ni dans la commande locale, ni dans la table des
-          # processus du VPS.
-          {
-            cat docker/deploy-remote.sh
-            printf '%s\n' "$REGISTRY_TOKEN"
-          } | ssh -i ~/.ssh/id_deploy -p "$PORT" "$SSH_USER@$HOST" \
-                "IMAGE='$IMAGE' TARGET='$TARGET' REGISTRY_USER='$REGISTRY_USER' bash -s"
-
-      - name: Vérifier que l'application répond
-        env:
-          HOST: ${{ secrets.DEPLOY_HOST }}
-          SSH_USER: ${{ secrets.DEPLOY_USER }}
-          PORT: ${{ secrets.DEPLOY_PORT || '22' }}
-          TARGET: ${{ secrets.DEPLOY_PATH }}
-        run: |
-          # Contrôle depuis le VPS et non depuis le runner : l'application n'est
-          # publiée que sur la boucle locale, le proxy 1Panel est devant.
-          ssh -i ~/.ssh/id_deploy -p "$PORT" "$SSH_USER@$HOST" \
-            "cd '$TARGET' && docker compose exec -T web wget -q --spider http://127.0.0.1:8080/up && echo 'santé applicative : OK'"
+          # Le jeton part sur l'entrée standard, consommée par `docker login` : il
+          # n'apparaît pas dans la table des processus du VPS. `--wait` attend la
+          # santé du conteneur, donc une migration en échec fait échouer la livraison.
+          ssh -i ~/.ssh/id_deploy -p "$PORT" "$SSH_USER@$HOST" "
+            set -e
+            cd '$TARGET'
+            chmod 600 .env
+            docker login ghcr.io -u '$GITHUB_ACTOR' --password-stdin
+            docker compose pull --quiet
+            docker compose up -d --wait --wait-timeout 240 --remove-orphans
+            docker logout ghcr.io >/dev/null
+            docker image prune --force --filter 'until=168h' >/dev/null
+            docker compose ps
+          " <<< "$TOKEN"

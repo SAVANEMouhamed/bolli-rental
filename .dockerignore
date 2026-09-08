@@ -58,5 +58,4 @@ pint.json
 # `docker/` en revanche y entre : il porte la configuration de nginx, de PHP et
 # le point d'entrée.
 docker-compose.yml
-docker/deploy-remote.sh
 docker/env.production.example
