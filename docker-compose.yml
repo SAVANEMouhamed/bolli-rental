@@ -3,23 +3,45 @@ name: bolli-rental
 services:
     app:
         image: ${APP_IMAGE:?renseigner APP_IMAGE dans .env}
+        # Nom fixe : c'est la cible que vise le proxy 1Panel, qui tourne lui aussi
+        # dans un conteneur et ne peut donc pas joindre la boucle locale de l'hôte.
+        container_name: bolli-rental
         restart: unless-stopped
         env_file:
             - .env
+        # APP_PORT pilote tout : le port publié sur l'hôte, celui qu'écoute
+        # FrankenPHP dans le conteneur, et la cible du contrôle de santé. Aucune
+        # valeur par défaut : un port choisi en silence finirait par entrer en
+        # collision avec un autre service du serveur, et le proxy servirait
+        # tranquillement la mauvaise application.
+        environment:
+            SERVER_NAME: ':${APP_PORT:?choisir un port libre dans .env}'
         ports:
-            - '127.0.0.1:${APP_PORT:-8002}:8080'
-        # Rend la base gérée par 1Panel joignable via host.docker.internal quand elle
-        # n'est pas sur le réseau Docker de cette composition.
+            - '127.0.0.1:${APP_PORT}:${APP_PORT}'
+        # Rejoint le réseau de 1Panel pour joindre la base par son nom de
+        # conteneur ; host.docker.internal couvre le cas où elle écoute sur l'hôte.
+        networks:
+            - default
+            - database
         extra_hosts:
             - 'host.docker.internal:host-gateway'
         healthcheck:
-            test: ['CMD', 'wget', '-qO-', 'http://127.0.0.1:8080/up']
-            interval: 15s
+            test: ['CMD', 'wget', '-qO-', 'http://127.0.0.1:${APP_PORT}/up']
+            interval: 30s
             timeout: 5s
-            retries: 5
-            start_period: 90s
+            retries: 3
+            # Migrations, seeders et caches occupent les premières secondes :
+            # les sondes de cette fenêtre ne comptent pas comme des échecs, et
+            # `start_interval` fait passer au vert dès la première réussie.
+            start_period: 120s
+            start_interval: 3s
         logging:
             driver: json-file
             options:
                 max-size: '10m'
                 max-file: '3'
+
+networks:
+    database:
+        external: true
+        name: ${DB_NETWORK:-1panel-network}

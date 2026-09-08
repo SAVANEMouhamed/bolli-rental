@@ -400,8 +400,13 @@ Trois gestes manuels, et rien d'autre :
 1. Créer la base PostgreSQL dans **1Panel**.
 2. Créer le répertoire de déploiement sur le VPS, appartenant à l'utilisateur SSH,
    qui doit être membre du groupe `docker`.
-3. Créer un site dans **1Panel**, en proxy inverse vers `127.0.0.1:8080`, avec son
-   certificat.
+3. Créer un site dans **1Panel**, en proxy inverse vers **`http://bolli-rental:8080`**,
+   avec son certificat.
+
+    La cible est le **nom du conteneur**, pas `127.0.0.1`. OpenResty tourne lui-même
+    dans un conteneur : `127.0.0.1` y désigne OpenResty, pas l'hôte, et le proxy
+    renvoie 502. Les deux conteneurs se joignent par leur nom parce qu'ils partagent
+    le réseau de 1Panel.
 
 Puis renseigner le dépôt GitHub. Le fichier d'environnement du serveur et la
 composition sont **rendus et déposés par la chaîne à chaque livraison** : rien

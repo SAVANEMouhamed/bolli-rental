@@ -126,14 +126,15 @@ jobs:
           DB_HOST: ${{ vars.DB_HOST }}
           DB_PORT: ${{ vars.DB_PORT }}
           DB_DATABASE: ${{ vars.DB_DATABASE }}
-          DB_USERNAME: ${{ vars.DB_USERNAME}}
+          DB_USERNAME: ${{ vars.DB_USERNAME }}
+          DB_NETWORK: ${{ vars.DB_NETWORK || '1panel-network' }}
           MAIL_HOST: ${{ vars.MAIL_HOST }}
           MAIL_PORT: ${{ vars.MAIL_PORT }}
           MAIL_USERNAME: ${{ vars.MAIL_USERNAME }}
           MAIL_FROM_ADDRESS: ${{ vars.MAIL_FROM_ADDRESS }}
           SEED_ON_DEPLOY: ${{ vars.SEED_ON_DEPLOY || 'true' }}
         run: |
-          for required in APP_KEY DB_PASSWORD APP_URL; do
+          for required in APP_KEY DB_PASSWORD APP_URL APP_PORT DB_HOST DB_PORT DB_DATABASE DB_USERNAME; do
             if [ -z "${!required}" ]; then
               echo "::error::${required} est vide — renseigner le secret ou la variable du dépôt"
               exit 1
@@ -178,6 +179,7 @@ jobs:
           DB_DATABASE=${DB_DATABASE}
           DB_USERNAME=${DB_USERNAME}
           DB_PASSWORD=${DB_PASSWORD}
+          DB_NETWORK=${DB_NETWORK}
 
           SESSION_DRIVER=database
           SESSION_LIFETIME=120
