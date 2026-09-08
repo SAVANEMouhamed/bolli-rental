@@ -1,0 +1,94 @@
+# Contrôles de qualité : formatage, lint, types, analyse statique et tests.
+#
+# Appelé de deux façons — directement sur une pull request, et par le workflow de
+# déploiement, qui refuse de livrer sans ces contrôles au vert. Un seul endroit
+# décrit donc ce que « vert » veut dire.
+
+name: CI
+
+on:
+  pull_request:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  ci:
+    name: Qualité et tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    # La suite Pest tourne sur SQLite en mémoire, pour sa vitesse. L'application,
+    # elle, tourne sur PostgreSQL : sans cette base, les migrations et les seeders
+    # ne seraient jamais vérifiés sur le moteur de production — c'est là que vivent
+    # les contraintes CHECK, que SQLite ignore.
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_DB: bolli_ci
+          POSTGRES_USER: bolli
+          POSTGRES_PASSWORD: bolli
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U bolli -d bolli_ci"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 12
+
+    env:
+      DB_CONNECTION: pgsql
+      DB_HOST: 127.0.0.1
+      DB_PORT: 5432
+      DB_DATABASE: bolli_ci
+      DB_USERNAME: bolli
+      DB_PASSWORD: bolli
+
+    steps:
+      - name: Récupérer le code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Installer PHP
+        uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # v2
+        with:
+          php-version: '8.4'
+          extensions: pdo_pgsql, intl, zip, bcmath
+          tools: composer:v2
+          coverage: none
+
+      - name: Installer Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Installer les dépendances PHP
+        run: composer install --no-interaction --prefer-dist --no-progress
+
+      - name: Préparer l'environnement
+        run: |
+          cp .env.example .env
+          php artisan key:generate
+
+      # Les tests de fonctionnalité rendent la vue racine d'Inertia, qui appelle
+      # la directive @vite : sans manifeste, toute la suite échouerait.
+      - name: Compiler les assets
+        run: |
+          npm ci --no-audit --no-fund
+          npm run build
+
+      # Ce que la suite Pest ne peut pas prouver : que le schéma s'applique bien
+      # sur PostgreSQL, et que les seeders sont rejouables — c'est exactement ce
+      # que fait le conteneur applicatif à chaque livraison.
+      - name: Vérifier migrations et seeders sur PostgreSQL
+        run: |
+          php artisan migrate --force --no-interaction
+          php artisan db:seed --force --no-interaction
+          php artisan db:seed --force --no-interaction
+
+      - name: Contrôles de qualité et tests
+        run: composer ci:check

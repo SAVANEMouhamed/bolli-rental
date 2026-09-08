@@ -1,0 +1,150 @@
+# Livraison continue vers le VPS.
+#
+# Un push sur `develop` ou sur `main` déploie sur le même environnement, à la
+# demande du responsable du projet : la dernière livraison gagne. Le verrou de
+# concurrence garantit qu'elles ne se croisent jamais.
+#
+# La chaîne ne dépend d'aucune action tierce : seule `actions/checkout`, publiée
+# par GitHub, est utilisée. La construction et la livraison passent par le client
+# Docker et par ssh, déjà présents sur le runner. C'est autant de code que nous
+# n'exécutons pas en confiance aveugle.
+
+name: Déploiement
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: deploiement-vps
+  cancel-in-progress: false
+
+env:
+  REGISTRY: ghcr.io
+
+jobs:
+  ci:
+    uses: ./.github/workflows/ci.yml
+
+  image:
+    name: Construire et publier l'image
+    needs: ci
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    outputs:
+      image: ${{ steps.tags.outputs.image }}
+
+    steps:
+      - name: Récupérer le code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Calculer les étiquettes
+        id: tags
+        run: |
+          repository="${REGISTRY}/${GITHUB_REPOSITORY,,}"
+          branch="${GITHUB_REF_NAME//\//-}"
+          # L'étiquette déployée est immuable : elle nomme un commit précis, ce
+          # qui rend un retour arrière trivial et un diagnostic sans ambiguïté.
+          {
+            echo "image=${repository}:sha-${GITHUB_SHA::12}"
+            echo "branch_tag=${repository}:${branch}"
+            echo "cache_tag=${repository}:buildcache"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: S'authentifier auprès de GHCR
+        env:
+          TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: printf '%s' "$TOKEN" | docker login "$REGISTRY" -u "${{ github.actor }}" --password-stdin
+
+      - name: Construire et publier
+        run: |
+          docker buildx create --use --name builder --driver docker-container >/dev/null
+          docker buildx build \
+            --tag "${{ steps.tags.outputs.image }}" \
+            --tag "${{ steps.tags.outputs.branch_tag }}" \
+            --cache-from "type=registry,ref=${{ steps.tags.outputs.cache_tag }}" \
+            --cache-to "type=registry,ref=${{ steps.tags.outputs.cache_tag }},mode=max" \
+            --label "org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}" \
+            --label "org.opencontainers.image.revision=${{ github.sha }}" \
+            --label "org.opencontainers.image.created=$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            --provenance=false \
+            --push \
+            .
+
+  deploy:
+    name: Livrer sur le VPS
+    needs: image
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: production
+
+    steps:
+      # La clé et l'empreinte du serveur passent par des variables d'environnement
+      # et non par une interpolation dans le script : une valeur interpolée finit
+      # dans le texte exécuté, et peut s'y comporter autrement qu'en donnée.
+      - name: Récupérer le code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Préparer l'accès SSH
+        env:
+          SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+        run: |
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/id_deploy
+          chmod 600 ~/.ssh/id_deploy
+          # Empreinte connue à l'avance plutôt que ssh-keyscan : accepter une clé
+          # inconnue à la première connexion, c'est accepter un serveur inconnu.
+          printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/known_hosts
+
+      - name: Envoyer la composition
+        env:
+          HOST: ${{ secrets.DEPLOY_HOST }}
+          SSH_USER: ${{ secrets.DEPLOY_USER }}
+          PORT: ${{ secrets.DEPLOY_PORT || '22' }}
+          TARGET: ${{ secrets.DEPLOY_PATH }}
+        run: |
+          scp -i ~/.ssh/id_deploy -P "$PORT" \
+            docker-compose.yml "$SSH_USER@$HOST:$TARGET/docker-compose.yml"
+
+      - name: Déployer
+        env:
+          HOST: ${{ secrets.DEPLOY_HOST }}
+          SSH_USER: ${{ secrets.DEPLOY_USER }}
+          PORT: ${{ secrets.DEPLOY_PORT || '22' }}
+          TARGET: ${{ secrets.DEPLOY_PATH }}
+          IMAGE: ${{ needs.image.outputs.image }}
+          REGISTRY_USER: ${{ github.actor }}
+          REGISTRY_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Le script part sur l'entrée standard et le jeton sur la ligne qui suit :
+          # il n'apparaît donc ni dans la commande locale, ni dans la table des
+          # processus du VPS.
+          {
+            cat docker/deploy-remote.sh
+            printf '%s\n' "$REGISTRY_TOKEN"
+          } | ssh -i ~/.ssh/id_deploy -p "$PORT" "$SSH_USER@$HOST" \
+                "IMAGE='$IMAGE' TARGET='$TARGET' REGISTRY_USER='$REGISTRY_USER' bash -s"
+
+      - name: Vérifier que l'application répond
+        env:
+          HOST: ${{ secrets.DEPLOY_HOST }}
+          SSH_USER: ${{ secrets.DEPLOY_USER }}
+          PORT: ${{ secrets.DEPLOY_PORT || '22' }}
+          TARGET: ${{ secrets.DEPLOY_PATH }}
+        run: |
+          # Contrôle depuis le VPS et non depuis le runner : l'application n'est
+          # publiée que sur la boucle locale, le proxy 1Panel est devant.
+          ssh -i ~/.ssh/id_deploy -p "$PORT" "$SSH_USER@$HOST" \
+            "cd '$TARGET' && docker compose exec -T web wget -q --spider http://127.0.0.1:8080/up && echo 'santé applicative : OK'"

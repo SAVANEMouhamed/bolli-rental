@@ -1,0 +1,62 @@
+# Contexte de build : tout ce qui n'est pas nécessaire à la construction de l'image.
+# Chaque entrée réduit le contexte envoyé au démon et évite d'invalider le cache.
+
+.git
+.github
+.gitignore
+.gitattributes
+.editorconfig
+
+# Dépendances : réinstallées dans l'étage de construction, jamais copiées.
+node_modules
+vendor
+
+# Artefacts locaux : régénérés dans l'image, une copie périmée serait pire que rien.
+public/build
+public/hot
+public/storage
+public/fonts-manifest.dev.json
+bootstrap/cache/*.php
+bootstrap/ssr
+storage/logs/*
+storage/framework/cache/data/*
+storage/framework/sessions/*
+storage/framework/views/*
+resources/js/actions
+resources/js/routes
+resources/js/wayfinder
+
+# Secrets : ne doivent jamais entrer dans une image.
+.env
+.env.*
+!.env.example
+auth.json
+
+# Outillage de développement et documentation.
+tests
+docs
+.claude
+.cursor
+.agents
+.junie
+.mcp.json
+boost.json
+phpunit.xml
+phpstan.neon
+pint.json
+*.md
+!README.md
+
+# Fichiers d'IDE et d'OS.
+.idea
+.vscode
+.zed
+.fleet
+.DS_Store
+
+# Le fichier de composition décrit le déploiement, il n'entre pas dans l'image.
+# `docker/` en revanche y entre : il porte la configuration de nginx, de PHP et
+# le point d'entrée.
+docker-compose.yml
+docker/deploy-remote.sh
+docker/env.production.example

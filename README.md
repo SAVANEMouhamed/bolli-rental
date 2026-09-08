@@ -21,13 +21,13 @@ Ce tableau décrit ce qui existe réellement dans le dépôt, rien de plus.
 | Filtres agent, statut, motif, période       | ✅ fait, plus sens, étiquette et recherche texte |
 | Rattachement d'un appel à une réservation   | ✅ fait, avec vérification serveur du client     |
 | Tableau de bord et graphique                | ✅ fait, deux types de graphiques                |
-| Déploiement Laravel Cloud                   | ⛔ à faire — voir « Application en ligne »       |
+| Déploiement                                 | ⚙️ chaîne prête, mise en ligne à faire           |
 
 Bonus du cahier des charges :
 
 | Bonus                           | État                                                |
 | ------------------------------- | --------------------------------------------------- |
-| Tests automatisés               | ✅ 114 tests Pest                                   |
+| Tests automatisés               | ✅ 118 tests Pest                                   |
 | API REST exposant les appels    | ✅ `/api/v1`, en lecture, documentée en OpenAPI 3.1 |
 | Volet IA (résumé, sentiment)    | ⛔ non commencé                                     |
 | Notification sur appel `urgent` | ⛔ non commencé                                     |
@@ -322,7 +322,7 @@ par défaut.
 
 ### Pas fait
 
-- Déploiement Laravel Cloud
+- Mise en ligne effective (la chaîne de déploiement, elle, est prête et testée)
 - Volet IA (résumé, sentiment, transcript)
 - Notification sur appel marqué `urgent`
 - Écriture via l'API
@@ -355,39 +355,102 @@ par défaut.
 
 ## Application en ligne
 
-Pas encore déployée. L'URL Laravel Cloud sera ajoutée ici au moment du
-déploiement ; le compte de démonstration ci-dessus y donnera accès.
+Pas encore déployée : l'URL publique sera ajoutée ici, et le compte de
+démonstration ci-dessus y donnera accès.
 
-### Procédure de déploiement
+### Pourquoi pas Laravel Cloud
 
-Laravel Cloud, offre gratuite, sur la branche `main`.
+Le §5.2 du cahier des charges demande un déploiement sur **Laravel Cloud (offre
+gratuite)**. Le rendu s'en écarte volontairement : l'hébergement se fait sur un
+**VPS administré avec 1Panel**, faute d'offre gratuite exploitable au moment du
+rendu. L'exigence de fond — une URL publique testable avec un compte de
+démonstration documenté — est tenue à l'identique. C'est le seul écart au sujet,
+et il est signalé ici plutôt que découvert à l'exécution.
 
-1. Connecter le dépôt GitHub, puis provisionner une base **Serverless Postgres** :
-   les variables `DB_*` sont injectées par la plateforme.
-2. Commande de build : `composer install --no-dev --optimize-autoloader`, puis
-   `npm ci && npm run build`.
-3. Commande de déploiement : `php artisan migrate --force` puis
-   `php artisan db:seed --force`. Les seeders sont rejouables — un redéploiement
-   ne duplique pas le jeu de démonstration et remet le mot de passe du compte de
-   recette à la valeur publiée ci-dessus.
-4. Variables d'environnement à poser sur la plateforme :
+### Ce qui compose le déploiement
 
-| Variable                | Valeur                | Pourquoi                                                    |
-| ----------------------- | --------------------- | ----------------------------------------------------------- |
-| `APP_ENV`               | `production`          | active les gardes de production (voir `AppServiceProvider`) |
-| `APP_DEBUG`             | `false`               | aucune trace d'erreur exposée                               |
-| `APP_URL`               | l'URL fournie         | liens absolus corrects, notamment dans les e-mails          |
-| `SESSION_SECURE_COOKIE` | `true`                | cookie de session limité à HTTPS                            |
-| `MAIL_*`                | les identifiants SMTP | sans quoi l'invitation d'un agent échoue                    |
+| Fichier                        | Rôle                                                              |
+| ------------------------------ | ----------------------------------------------------------------- |
+| `Dockerfile`                   | Image de production, deux étages : construction puis exécution    |
+| `docker-compose.yml`           | Quatre conteneurs : `db`, `app`, `web`, `queue`                   |
+| `docker/entrypoint.sh`         | Migrations, seeders et caches au démarrage, selon le rôle         |
+| `docker/nginx.conf`            | Serveur web sans privilèges, en-têtes défensifs, cache des assets |
+| `docker/deploy-remote.sh`      | Script joué sur le VPS par la chaîne de livraison                 |
+| `.github/workflows/ci.yml`     | Qualité et tests, réutilisable                                    |
+| `.github/workflows/deploy.yml` | Construction, publication sur GHCR, livraison par SSH             |
 
-Aucun de ces secrets ne vit dans le dépôt : `.env` est ignoré par Git et
-`.env.example` ne porte que des valeurs neutres.
+Une seule image sert les quatre rôles, pilotés par `CONTAINER_ROLE`. Le serveur
+web y trouve donc exactement les assets compilés avec le code PHP qu'exécute
+l'application : deux images séparées finiraient par diverger.
 
-Les proxys de Laravel Cloud sont reconnus nativement par le framework, il n'y a
-rien à configurer pour le HTTPS derrière le répartiteur.
+**Tout est automatique au démarrage du conteneur `app`** : attente de la base,
+migrations, jeu de démonstration, puis caches de configuration, de routes, de
+vues et d'événements. Les seeders sont idempotents ; un redéploiement ne duplique
+rien et remet le mot de passe du compte de recette à la valeur publiée ci-dessus.
 
-L'instance et la base **hibernent** après une période d'inactivité sur l'offre
-gratuite : la première requête peut prendre quelques secondes.
+### Mise en place, une seule fois
+
+```bash
+# sur le VPS, dans le répertoire de déploiement
+cp docker/env.production.example .env   # puis compléter APP_KEY, DB_PASSWORD, MAIL_*
+php artisan key:generate --show         # depuis un poste de développement
+```
+
+Puis, côté GitHub, six secrets de dépôt :
+
+| Secret               | Contenu                                                            |
+| -------------------- | ------------------------------------------------------------------ |
+| `DEPLOY_HOST`        | adresse du VPS                                                     |
+| `DEPLOY_USER`        | utilisateur SSH, membre du groupe `docker`                         |
+| `DEPLOY_PORT`        | port SSH, `22` par défaut                                          |
+| `DEPLOY_PATH`        | répertoire contenant `docker-compose.yml` et `.env`                |
+| `DEPLOY_SSH_KEY`     | clé privée dédiée au déploiement, sans phrase de passe             |
+| `DEPLOY_KNOWN_HOSTS` | sortie de `ssh-keyscan -p <port> <hôte>`, relevée sur un canal sûr |
+
+L'empreinte du serveur est fournie à l'avance plutôt que découverte à la première
+connexion : accepter une clé inconnue, c'est accepter un serveur inconnu.
+
+Enfin, dans 1Panel, un site en proxy inverse vers `127.0.0.1:8080` avec un
+certificat Let's Encrypt. Le conteneur `web` n'écoute que sur la boucle locale :
+le proxy est le seul chemin d'entrée, et PostgreSQL n'est joignable que depuis le
+réseau Docker interne.
+
+### Ce que fait un push
+
+`develop` et `main` livrent sur le **même** environnement, à la demande : la
+dernière livraison gagne, et un verrou de concurrence empêche deux déploiements
+de se croiser.
+
+1. **CI** — formatage, lint, types, PHPStan niveau 7, 118 tests Pest, plus les
+   migrations et les seeders rejoués sur un vrai PostgreSQL. Rien n'est livré sans
+   ces contrôles au vert.
+2. **Image** — construction et publication sur GHCR sous une étiquette immuable
+   `sha-<commit>`, avec cache de couches dans le registre.
+3. **Livraison** — `docker compose up -d --wait` sur le VPS. `--wait` n'attend pas
+   le démarrage mais la **santé** des conteneurs : une migration qui échoue fait
+   échouer la livraison au lieu de publier une application morte.
+4. **Vérification** — appel de `/up` depuis le VPS.
+
+Revenir en arrière ne demande qu'une chose, puisque l'étiquette nomme un commit :
+
+```bash
+sed -i 's|^APP_IMAGE=.*|APP_IMAGE=ghcr.io/<compte>/bolli-rental:sha-<commit>|' .env
+docker compose up -d --wait
+```
+
+### Deux points de vigilance assumés
+
+**`fakerphp/faker` est une dépendance de production.** L'image est construite avec
+`--no-dev`, et le jeu de démonstration exigé au §2b est produit par des factories
+qui s'appuient sur Faker. Sans ce déplacement, le conteneur démarre puis échoue au
+seeding. C'est le prix d'un déploiement qui est une **démonstration** : sur une
+vraie production, les seeders et Faker disparaîtraient ensemble.
+
+**`TRUSTED_PROXIES=*` est sûr ici, et seulement ici.** Le conteneur n'est publié
+que sur la boucle locale du VPS : le proxy est le seul émetteur possible des
+en-têtes `X-Forwarded-*`. Sans cette valeur, Laravel se croit en clair, fabrique
+des liens `http` dans les e-mails d'invitation et rend `SESSION_SECURE_COOKIE`
+inopérant. Deux tests couvrent les deux sens de la règle.
 
 ---
 
